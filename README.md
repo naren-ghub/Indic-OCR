@@ -1,78 +1,101 @@
-# Indic-OCR
+<div align="center">
+  <h1>Indic-OCR</h1>
+  <p><b>Layout-Aware Multilingual Document Digitization Pipeline</b></p>
 
-An end-to-end Optical Character Recognition (OCR) pipeline explicitly optimized for complex Indic languages (focusing on Tamil). This project uses state-of-the-art vision models and language models to extract, structure, and correct text from difficult document layouts.
-
-## Features
-
-- **Surya Integration**: Robust line-level bounding box detection and text recognition without relying on destructive traditional binarization.
-- **Recursive X-Y Cut Layout Analysis**: A deterministic, geometric approach to analyzing multi-column layouts, ensuring text is extracted in the correct human reading order.
-- **Full-Page Fallback Mechanisms**: Automatically adapts to dense text layouts (like newspapers) where layout bounding boxes might misclassify text blocks as pictures.
-- **ByT5 Error Correction Layer**: Incorporates a custom-trained `google/byt5-small` model (`Naren-hug/byt5-tamil-ocr-v1`) that naturally understands raw UTF-8 byte sequences to fix character-level OCR garbling.
-- **Header & Footer Stripping**: Intelligent artifact stripping using `TextFormatter` to ensure seamless reading flow across page boundaries.
-
-## Architecture
-
-* `core_pipeline/`: The core logic, including the `SuryaEngine`, `layout_engine` (X-Y Cut), `text_formatter`, and `lm_corrector`.
-* `deploy/`: Contains the Gradio web UI and Modal cloud serverless deployment scripts.
-* `research/`: Notebooks and data processing scripts used to build the ByT5 finetuning dataset.
-* `tools/`: Independent CLI utilities for bulk processing and PDF extraction.
+  [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
+  [![Framework](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org)
+  [![Model](https://img.shields.io/badge/Surya-Vision_Transformer-green)](https://github.com/VikParuchuri/surya)
+  [![Finetune](https://img.shields.io/badge/ByT5-google%2Fbyt5--small-yellow)](https://huggingface.co/google/byt5-small)
+  [![Live Demo](https://img.shields.io/badge/Live-Demo-purple)](https://indicocr.netlify.app)
+</div>
 
 ---
 
-## Local Setup
+**Indic-OCR** is an end-to-end Computer Vision and NLP framework specifically optimized for digitizing complex documents in **11 Indic languages**. 
 
-### Requirements
+Unlike traditional rule-based or Tesseract systems that struggle with dense layouts and complex Indic typography (such as Tamil and Telugu), this pipeline treats OCR as a unified multimodal AI problem, leveraging state-of-the-art Vision Transformers and sequence-to-sequence Language Models.
+
+## 🧠 Advanced AI & NLP Architecture
+
+The pipeline is orchestrated across four specialized neural layers:
+
+### 1. Neural Ingestion & Bypassing Binarization
+We handle unstructured document formats (PDF/DOCX) by converting them into high-fidelity visual tensors. For scanned documents, we employ direct bitmap extraction to bypass compression artifacts. **Crucially, we do not binarize or threshold the images**, ensuring the downstream Vision models receive the highest possible RGB signal-to-noise ratio.
+
+### 2. Vision-Transformer OCR Engine (Surya)
+At the core of the recognition layer is the **Surya Engine**, utilizing a Vision Transformer (ViT) backbone:
+- **Bbox Detection**: A hybrid CNN/Transformer identifies line-level regions of interest (RoI) with pixel-perfect precision.
+- **Sequence Modeling**: Text recognition treats each line as a sequence-to-sequence problem, mapping visual features to Unicode characters. This "neural reading" approach generalizes across thousands of fonts and even handwritten-style print.
+
+### 3. Cognitive Layout Analysis (Recursive X-Y Cut)
+Raw OCR output is just a "bag of words." We apply a **Supervised Layout Model** to segment the page into semantic blocks (Body, Header, Footer, Picture).
+- **Geometric Reasoning**: We employ a deterministic **Recursive X-Y Cut Algorithm** on the model's bounding boxes to reconstruct the human-intended reading order, preventing multi-column text from interleaving.
+- **Newspaper Fallback**: If dense text causes the layout model to misclassify regions as `Picture`, a fallback heuristic triggers full-page sequential reading.
+
+### 4. NLP Refinement & Unicode Normalization
+Post-recognition, the text undergoes a rigorous NLP cleaning phase:
+- Regex-based noise suppression for common OCR hallucinations (stray HTML tags, foreign script leakage).
+- Strict **Unicode Normalization (NFC)** to ensure combined characters in Indic scripts (vowel marks and consonants) are represented consistently.
+- Intelligent **Header/Footer Stripping** using `TextFormatter` to ensure seamless reading flow across page boundaries.
+
+---
+
+## 🚀 Neural Language Correction (ByT5 Finetuning)
+
+To push the Character Error Rate (CER) below 5%, the pipeline incorporates a **Neural Correction Pass** utilizing a custom fine-tuned `google/byt5-small` model.
+
+### Why ByT5?
+Standard subword tokenizers (like those in mT5 or Llama) destroy the token mapping if an OCR engine makes a single-character typo. **ByT5 operates directly on raw UTF-8 bytes**, making it uniquely suited to surgically fix character-level OCR garbling in Indic languages.
+
+### Training Details
+- **Dataset**: `Naren-hug/tamil-ocr-byt5-dataset` — 10,000 synthetic-to-real noise pairs generated by feeding clean corpus data through a custom noise generator.
+- **Hardware**: Fine-tuned on Kaggle T4 x2 GPUs with `fp16=True` and `adafactor` optimizer.
+- **Results**: The model achieved a **Validation CER of 9.84%** on raw OCR text, successfully learning to reconstruct proper Tamil morphology from heavily degraded inputs.
+- **Hub Checkpoint**: Hosted at [`Naren-hug/byt5-tamil-ocr-v1`](https://huggingface.co/Naren-hug/byt5-tamil-ocr-v1).
+
+*(Note: The LM Corrector runs as an isolated subprocess to prevent `transformers` version conflicts with the vision backbone).*
+
+---
+
+## 📊 Performance Benchmarks
+
+- **Supported Scripts**: Tamil, Hindi, Telugu, Bengali, Kannada, Malayalam, Gujarati, Marathi, Punjabi, Odia, English.
+- **Baseline CER (Raw Surya)**: ~18–23% on highly degraded archival prints.
+- **Throughput**: ~2–5 seconds per page on a T4 GPU.
+- **Scale**: Capable of batch processing documents up to 100 pages in a single stateless run.
+
+---
+
+## 💻 Local Setup & Inference
 
 Ensure you have Python 3.10+ installed.
 
 ```bash
-# Clone the repository
-git clone https://github.com/YOUR_USERNAME/Indic-OCR.git
+git clone https://github.com/naren-ghub/Indic-OCR.git
 cd Indic-OCR
 
-# Create and activate a virtual environment
 python -m venv .venv
-# On Windows:
-.venv\Scripts\activate
-# On Mac/Linux:
-source .venv/bin/activate
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-# Install dependencies
+# Install dependencies (ensure PyTorch matches your CUDA version)
 pip install -r requirements.txt
 ```
 
-*(Note: PyTorch will be installed by the requirements file. If you have a GPU, ensure you install the CUDA-enabled version of PyTorch for optimal performance with Surya and ByT5).*
-
-### Running the Pipeline Locally
-
-You can use the command-line interface to run the OCR engine on a local PDF or image.
-
+Run the pipeline via CLI:
 ```bash
-# Run the pipeline on a specific file
 python core_pipeline/main.py --input "demo_data/எலி.pdf" --output_dir "output"
 ```
-
-You can control various flags in `core_pipeline/config.py` (e.g., toggling the LM correction layer `LM_CORRECTION_ENABLED` or tweaking `QUALITY_CONF_THRESHOLD`).
+*Toggles like `LM_CORRECTION_ENABLED` or `QUALITY_CONF_THRESHOLD` can be found in `core_pipeline/config.py`.*
 
 ---
 
-## Cloud Deployment (Modal Serverless)
+## ☁️ Cloud Deployment (Modal Serverless)
 
-The application includes a fully containerized deployment script for [Modal](https://modal.com), allowing you to run the heavy AI models on serverless A10G/T4 GPUs.
+The repository includes a fully containerized script for [Modal](https://modal.com), allowing you to run the heavy AI models on serverless A10G/T4 GPUs with a beautiful Gradio UI.
 
-1. **Install and authenticate with Modal:**
-   ```bash
-   pip install modal
-   modal setup
-   ```
-
-2. **Deploy the Gradio Web App:**
-   Navigate to the `deploy/` directory and run the deployment script. This will bundle the `core_pipeline` and deploy it as a serverless Gradio app.
-
-   ```bash
-   cd deploy
-   modal deploy modal_app.py
-   ```
-
-3. **Access the Web App:**
-   Once deployed, Modal will print a public URL (e.g., `https://your-workspace--indic-ocr-web.modal.run`) where you can interact with the OCR UI from any browser.
+```bash
+pip install modal
+modal setup
+modal deploy deploy/modal_app.py
+```
+This provisions the container, downloads the Hugging Face weights, and exposes a public HTTPS endpoint scaling down to $0 when idle.

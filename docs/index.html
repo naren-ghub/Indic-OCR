@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Indic OCR — AI-Powered Multilingual Document Digitization</title>
+<meta name="description" content="Digitize scanned Tamil, Hindi, Telugu and 8 other Indic language documents using Layout-Aware Vision AI. Free GPU-accelerated OCR.">
+<meta property="og:title" content="Indic OCR">
+<meta property="og:description" content="AI OCR for 11 Indic languages. Upload scanned PDFs, images or DOCX files and download clean text instantly.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── Design Tokens ─────────────────────────────────────────── */
+:root {
+  --bg:        #0b0f19;
+  --bg2:       #111827;
+  --bg3:       #1a2236;
+  --border:    rgba(255,255,255,0.07);
+  --text:      #e2e8f0;
+  --muted:     #8b949e;
+  --blue:      #3b82f6;
+  --cyan:      #06b6d4;
+  --purple:    #8b5cf6;
+  --grad:      linear-gradient(135deg, var(--blue), var(--cyan));
+  --grad2:     linear-gradient(135deg, var(--purple), var(--blue));
+  --radius:    14px;
+  --shadow:    0 20px 60px rgba(0,0,0,0.5);
+  --nav-h:     68px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* ── Navbar ────────────────────────────────────────────────── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  height: var(--nav-h);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 5%;
+  background: rgba(11,15,25,0.85);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  transition: box-shadow 0.3s;
+}
+nav.scrolled { box-shadow: 0 4px 30px rgba(0,0,0,0.5); }
+
+.nav-brand {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 1.15rem; font-weight: 700; color: #fff; text-decoration: none;
+}
+.nav-brand .logo-mark {
+  width: 34px; height: 34px; border-radius: 8px;
+  background: var(--grad);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 800; color: #fff;
+}
+
+.nav-links {
+  display: flex; align-items: center; gap: 28px; list-style: none;
+}
+.nav-links a {
+  color: var(--muted); text-decoration: none;
+  font-size: 0.9rem; font-weight: 500;
+  transition: color 0.2s;
+}
+.nav-links a:hover { color: #fff; }
+
+.nav-cta {
+  background: var(--grad); color: #fff !important;
+  padding: 8px 18px; border-radius: 8px; font-weight: 600 !important;
+  transition: opacity 0.2s, transform 0.2s !important;
+}
+.nav-cta:hover { opacity: 0.9; transform: translateY(-1px); }
+
+/* ── Hero ──────────────────────────────────────────────────── */
+#hero {
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center;
+  padding: calc(var(--nav-h) + 60px) 5% 80px;
+  position: relative; overflow: hidden;
+}
+
+/* Background glow blobs */
+#hero::before {
+  content: '';
+  position: absolute; top: 20%; left: 50%;
+  transform: translateX(-50%);
+  width: 700px; height: 500px;
+  background: radial-gradient(ellipse, rgba(59,130,246,0.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+#hero::after {
+  content: '';
+  position: absolute; bottom: 10%; right: 10%;
+  width: 300px; height: 300px;
+  background: radial-gradient(ellipse, rgba(139,92,246,0.1) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: rgba(59,130,246,0.12);
+  border: 1px solid rgba(59,130,246,0.3);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 0.82rem; color: var(--cyan); font-weight: 500;
+  margin-bottom: 28px;
+  animation: fadeUp 0.6s ease both;
+}
+.badge-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--cyan);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.7); }
+}
+
+.hero-title {
+  font-size: clamp(2.4rem, 6vw, 4.2rem);
+  font-weight: 800; line-height: 1.12;
+  color: #fff;
+  margin-bottom: 24px;
+  animation: fadeUp 0.7s ease 0.1s both;
+}
+.hero-title .grad-text {
+  background: var(--grad);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-sub {
+  font-size: clamp(1rem, 2vw, 1.18rem);
+  color: var(--muted); max-width: 600px;
+  margin-bottom: 40px;
+  animation: fadeUp 0.7s ease 0.2s both;
+}
+
+.hero-btns {
+  display: flex; gap: 14px; flex-wrap: wrap; justify-content: center;
+  animation: fadeUp 0.7s ease 0.3s both;
+}
+.btn-primary {
+  background: var(--grad);
+  color: #fff; text-decoration: none;
+  padding: 14px 30px; border-radius: 10px;
+  font-size: 1rem; font-weight: 600;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 20px rgba(59,130,246,0.35);
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(59,130,246,0.5); }
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text); text-decoration: none;
+  padding: 14px 30px; border-radius: 10px;
+  font-size: 1rem; font-weight: 500;
+  border: 1px solid var(--border);
+  transition: background 0.2s, border-color 0.2s;
+}
+.btn-secondary:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.2); }
+
+/* Script preview strip below CTA */
+.script-strip {
+  margin-top: 60px;
+  display: flex; gap: 22px; flex-wrap: wrap; justify-content: center;
+  animation: fadeUp 0.7s ease 0.4s both;
+}
+.script-chip {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 999px; padding: 7px 16px;
+  font-size: 1rem; color: var(--muted);
+  transition: border-color 0.2s, color 0.2s;
+}
+.script-chip:hover { border-color: var(--blue); color: #fff; }
+
+/* ── Fade-up animation ─────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+/* Scroll reveal helper */
+.reveal {
+  opacity: 0; transform: translateY(30px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.reveal.visible { opacity: 1; transform: none; }
+
+/* ── Section base ──────────────────────────────────────────── */
+section { padding: 90px 5%; }
+.section-label {
+  display: inline-block;
+  font-size: 0.78rem; font-weight: 600; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--cyan);
+  margin-bottom: 12px;
+}
+.section-title {
+  font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+  font-weight: 700; color: #fff;
+  line-height: 1.2; margin-bottom: 16px;
+}
+.section-sub {
+  font-size: 1.05rem; color: var(--muted); max-width: 560px;
+}
+
+/* ── Responsive nav ────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .nav-links { display: none; }
+}
+
+/* ── How It Works ────────────────────────────────────────────── */
+#how-it-works { background: var(--bg2); }
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  margin-top: 50px;
+}
+.step-card {
+  position: relative;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 28px 24px;
+  transition: border-color 0.2s;
+}
+.step-card:hover { border-color: rgba(59,130,246,0.4); }
+.step-num {
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em;
+  color: var(--blue); text-transform: uppercase;
+  margin-bottom: 12px; display: block;
+}
+.step-title { font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.step-desc { font-size: 0.88rem; color: var(--muted); line-height: 1.65; }
+.step-connector {
+  display: none;
+}
+@media (min-width: 768px) {
+  .step-connector {
+    display: flex; align-items: center;
+    color: var(--border); font-size: 1.4rem;
+  }
+}
+
+/* ── App section ──────────────────────────────────────────────── */
+#app {
+  padding: 80px 5% 0;
+  display: flex; flex-direction: column; align-items: center;
+}
+.app-header { text-align: center; margin-bottom: 36px; }
+.app-frame-wrap {
+  width: 100%; max-width: 1200px;
+  border-radius: 18px; overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: 0 30px 90px rgba(0,0,0,0.6);
+  position: relative;
+  background: var(--bg2);
+  min-height: 800px;
+}
+.app-spinner {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 16px; color: var(--muted); font-size: 0.95rem;
+  pointer-events: none; z-index: 1;
+}
+.spin {
+  width: 38px; height: 38px;
+  border: 3px solid rgba(255,255,255,0.08);
+  border-top: 3px solid var(--blue);
+  border-radius: 50%;
+  animation: rotate 0.9s linear infinite;
+}
+@keyframes rotate { to { transform: rotate(360deg); } }
+.app-frame-wrap iframe {
+  width: 100%; height: 800px;
+  border: none; display: block;
+  position: relative; z-index: 2;
+  background: transparent;
+}
+
+/* ── Footer ─────────────────────────────────────────────────── */
+footer {
+  margin-top: 80px;
+  border-top: 1px solid var(--border);
+  padding: 50px 5%;
+  display: flex; flex-wrap: wrap;
+  align-items: center; justify-content: space-between;
+  gap: 24px;
+}
+.footer-brand { font-size: 1rem; font-weight: 700; color: #fff; }
+.footer-brand span { color: var(--muted); font-weight: 400; font-size: 0.9rem; display: block; margin-top: 4px; }
+.tech-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+.tech-badge {
+  font-size: 0.75rem; padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+.footer-links { display: flex; gap: 20px; }
+.footer-links a { color: var(--muted); text-decoration: none; font-size: 0.88rem; transition: color 0.2s; }
+.footer-links a:hover { color: #fff; }
+
+/* ── Stats bar ─────────────────────────────────────────────── */
+#stats {
+  padding: 0 5% 80px;
+  display: flex; justify-content: center;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  width: 100%; max-width: 900px;
+}
+.stat-card {
+  background: var(--bg2);
+  padding: 30px 24px; text-align: center;
+  transition: background 0.2s;
+}
+.stat-card:hover { background: var(--bg3); }
+.stat-num {
+  font-size: 2.2rem; font-weight: 800;
+  background: var(--grad);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1.1; display: block;
+}
+.stat-label { font-size: 0.83rem; color: var(--muted); margin-top: 5px; }
+
+/* ── Features grid ──────────────────────────────────────────── */
+#features { background: var(--bg2); }
+.features-header { margin-bottom: 50px; }
+.feat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  gap: 20px;
+}
+.feat-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px;
+  transition: border-color 0.25s, transform 0.25s;
+}
+.feat-card:hover { border-color: rgba(59,130,246,0.4); transform: translateY(-4px); }
+.feat-icon {
+  width: 44px; height: 44px; border-radius: 10px;
+  background: rgba(59,130,246,0.12);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.4rem;
+  margin-bottom: 16px;
+}
+.feat-title { font-size: 1.05rem; font-weight: 600; color: #fff; margin-bottom: 8px; }
+.feat-desc { font-size: 0.9rem; color: var(--muted); line-height: 1.65; }
+
+/* ── Languages section ──────────────────────────────────────── */
+#languages { padding-bottom: 100px; }
+.lang-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 14px;
+  margin-top: 44px;
+}
+.lang-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 16px;
+  text-align: center;
+  transition: border-color 0.2s, background 0.2s;
+  cursor: default;
+}
+.lang-card:hover { border-color: rgba(59,130,246,0.5); background: var(--bg3); }
+.lang-script { font-size: 1.8rem; display: block; margin-bottom: 8px; }
+.lang-name { font-size: 0.82rem; font-weight: 600; color: #fff; }
+.lang-eng { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ NAVBAR ════════════════════════════════════ -->
+<nav id="navbar">
+  <a class="nav-brand" href="#">
+    <div class="logo-mark">அ</div>
+    Indic OCR
+  </a>
+  <ul class="nav-links">
+    <li><a href="#features">Features</a></li>
+    <li><a href="#languages">Languages</a></li>
+    <li><a href="#how-it-works">How It Works</a></li>
+    <li><a href="#app" class="nav-cta">Launch App ↗</a></li>
+  </ul>
+</nav>
+
+<!-- ═══════════════ HERO ══════════════════════════════════════ -->
+<section id="hero">
+  <div class="hero-badge">
+    <span class="badge-dot"></span>
+    GPU-Accelerated · Free · Open Source
+  </div>
+
+  <h1 class="hero-title">
+    Digitize Indic<br>
+    <span class="grad-text">Language Documents</span><br>
+    with AI Precision
+  </h1>
+
+  <p class="hero-sub">
+    Upload scanned PDFs, images, or DOCX files in Tamil, Hindi, Telugu and 8 other Indic scripts.
+    Get clean, downloadable text in seconds — powered by Surya Vision AI on cloud GPUs.
+  </p>
+
+  <div class="hero-btns">
+    <a href="#app" class="btn-primary">▶&nbsp; Try It Free</a>
+    <a href="https://github.com/naren-ghub" target="_blank" class="btn-secondary">View on GitHub →</a>
+  </div>
+
+  <div class="script-strip">
+    <span class="script-chip">தமிழ்</span>
+    <span class="script-chip">हिन्दी</span>
+    <span class="script-chip">తెలుగు</span>
+    <span class="script-chip">বাংলা</span>
+    <span class="script-chip">ಕನ್ನಡ</span>
+    <span class="script-chip">മലയാളം</span>
+    <span class="script-chip">ગુજરાતી</span>
+    <span class="script-chip">ਪੰਜਾਬੀ</span>
+    <span class="script-chip">मराठी</span>
+    <span class="script-chip">ଓଡ଼ିଆ</span>
+    <span class="script-chip">English</span>
+  </div>
+</section>
+
+<!-- ═══════════════ STATS ════════════════════════════════════ -->
+<div id="stats">
+  <div class="stats-grid">
+    <div class="stat-card reveal"><span class="stat-num">11</span><div class="stat-label">Indic Languages</div></div>
+    <div class="stat-card reveal"><span class="stat-num">&lt;7%</span><div class="stat-label">Character Error Rate</div></div>
+    <div class="stat-card reveal"><span class="stat-num">100</span><div class="stat-label">Max Pages per Run</div></div>
+    <div class="stat-card reveal"><span class="stat-num">T4</span><div class="stat-label">GPU Accelerated</div></div>
+    <div class="stat-card reveal"><span class="stat-num">$0</span><div class="stat-label">Cost While Idle</div></div>
+  </div>
+</div>
+
+<!-- ═══════════════ FEATURES ══════════════════════════════════ -->
+<section id="features">
+  <div class="features-header reveal">
+    <span class="section-label">Capabilities</span>
+    <h2 class="section-title">Everything you need to digitize<br>Indic language documents</h2>
+    <p class="section-sub">Built on Vision Transformer models fine-tuned for complex Indic typography.</p>
+  </div>
+  <div class="feat-grid">
+    <div class="feat-card reveal"><div class="feat-icon">🔍</div><div class="feat-title">Layout-Aware OCR</div><div class="feat-desc">Surya Vision AI detects text regions, headers, and columns before OCR — not just raw pixel scanning.</div></div>
+    <div class="feat-card reveal"><div class="feat-icon">📄</div><div class="feat-title">Multi-Format Upload</div><div class="feat-desc">Accepts PDF (up to 100 pages), PNG, JPG, TIFF, BMP, WEBP, and DOCX files in a single upload.</div></div>
+    <div class="feat-card reveal"><div class="feat-icon">🌐</div><div class="feat-title">11 Indic Languages</div><div class="feat-desc">Tamil, Hindi, Telugu, Bengali, Kannada, Malayalam, Gujarati, Marathi, Punjabi, Odia and English.</div></div>
+    <div class="feat-card reveal"><div class="feat-icon">📊</div><div class="feat-title">Accuracy Metrics</div><div class="feat-desc">Upload a ground-truth reference to get CER and WER scores for scientific evaluation of output quality.</div></div>
+    <div class="feat-card reveal"><div class="feat-icon">⬇️</div><div class="feat-title">Instant Download</div><div class="feat-desc">Download the extracted text as a clean UTF-8 .txt file with per-page headers for easy navigation.</div></div>
+    <div class="feat-card reveal"><div class="feat-icon">⚡</div><div class="feat-title">Serverless GPU</div><div class="feat-desc">Runs on Modal.com cloud T4 GPUs. Auto-scales to zero — $0 idle cost, near-instant processing.</div></div>
+  </div>
+</section>
+
+<!-- ═══════════════ LANGUAGES ══════════════════════════════════ -->
+<section id="languages">
+  <div class="reveal">
+    <span class="section-label">Script Support</span>
+    <h2 class="section-title">Reads 11 languages natively</h2>
+    <p class="section-sub">Including both historic and modern print styles across the Indian subcontinent.</p>
+  </div>
+  <div class="lang-grid">
+    <div class="lang-card reveal"><span class="lang-script">தமிழ்</span><div class="lang-name">Tamil</div><div class="lang-eng">South India</div></div>
+    <div class="lang-card reveal"><span class="lang-script">हिन्दी</span><div class="lang-name">Hindi</div><div class="lang-eng">North India</div></div>
+    <div class="lang-card reveal"><span class="lang-script">తెలుగు</span><div class="lang-name">Telugu</div><div class="lang-eng">Andhra / Telangana</div></div>
+    <div class="lang-card reveal"><span class="lang-script">বাংলা</span><div class="lang-name">Bengali</div><div class="lang-eng">West Bengal / Bangladesh</div></div>
+    <div class="lang-card reveal"><span class="lang-script">ಕನ್ನಡ</span><div class="lang-name">Kannada</div><div class="lang-eng">Karnataka</div></div>
+    <div class="lang-card reveal"><span class="lang-script">മലയാളം</span><div class="lang-name">Malayalam</div><div class="lang-eng">Kerala</div></div>
+    <div class="lang-card reveal"><span class="lang-script">ગુજરાતી</span><div class="lang-name">Gujarati</div><div class="lang-eng">Gujarat</div></div>
+    <div class="lang-card reveal"><span class="lang-script">मराठी</span><div class="lang-name">Marathi</div><div class="lang-eng">Maharashtra</div></div>
+    <div class="lang-card reveal"><span class="lang-script">ਪੰਜਾਬੀ</span><div class="lang-name">Punjabi</div><div class="lang-eng">Punjab</div></div>
+    <div class="lang-card reveal"><span class="lang-script">ଓଡ଼ିଆ</span><div class="lang-name">Odia</div><div class="lang-eng">Odisha</div></div>
+    <div class="lang-card reveal"><span class="lang-script">Aa</span><div class="lang-name">English</div><div class="lang-eng">Global</div></div>
+  </div>
+</section>
+
+<!-- ═══════════════ HOW IT WORKS ═════════════════════════════════ -->
+<section id="how-it-works">
+  <div class="reveal">
+    <span class="section-label">Workflow</span>
+    <h2 class="section-title">Up and running in 4 steps</h2>
+    <p class="section-sub">No installation. No sign-up. Just upload and go.</p>
+  </div>
+  <div class="steps-grid">
+    <div class="step-card reveal">
+      <span class="step-num">Step 01</span>
+      <div class="step-title">📁 Upload Your Document</div>
+      <div class="step-desc">Drop any scanned PDF (up to 100 pages), image file (PNG/JPG/TIFF), or DOCX into the uploader.</div>
+    </div>
+    <div class="step-card reveal">
+      <span class="step-num">Step 02</span>
+      <div class="step-title">🌐 Select Languages</div>
+      <div class="step-desc">Choose one or more of the 11 supported Indic languages from the checkbox selector.</div>
+    </div>
+    <div class="step-card reveal">
+      <span class="step-num">Step 03</span>
+      <div class="step-title">▶️ Run OCR</div>
+      <div class="step-desc">Click Run OCR. The Vision AI processes each page on a cloud T4 GPU and streams a live log.</div>
+    </div>
+    <div class="step-card reveal">
+      <span class="step-num">Step 04</span>
+      <div class="step-title">⬇️ Download Output</div>
+      <div class="step-desc">Download your clean UTF-8 text file. Optionally upload a reference to score CER and WER accuracy.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ LIVE APP ═════════════════════════════════════ -->
+<section id="app">
+  <div class="app-header reveal">
+    <span class="section-label">Live Demo</span>
+    <h2 class="section-title">Try it right here</h2>
+    <p class="section-sub">The full application is embedded below — no redirect needed.</p>
+  </div>
+  <div class="app-frame-wrap reveal">
+    <div class="app-spinner" id="spinner">
+      <div class="spin"></div>
+      <div>Waking up GPU servers…<br><small style="opacity:0.6">(~10 seconds on first load)</small></div>
+    </div>
+    <iframe
+      src="https://naren-ghub--indic-ocr-fastapi-app.modal.run/?__theme=dark"
+      allow="clipboard-read; clipboard-write"
+      title="Indic OCR App"
+      onload="document.getElementById('spinner').style.display='none'">
+    </iframe>
+  </div>
+</section>
+
+<!-- ═══════════════ FOOTER ══════════════════════════════════════ -->
+<footer>
+  <div>
+    <div class="footer-brand">Indic OCR <span>Layout-Aware Multilingual Document Digitization</span></div>
+  </div>
+  <div class="tech-badges">
+    <span class="tech-badge">surya-ocr</span>
+    <span class="tech-badge">PyMuPDF</span>
+    <span class="tech-badge">gradio</span>
+    <span class="tech-badge">modal</span>
+    <span class="tech-badge">torch</span>
+    <span class="tech-badge">python</span>
+  </div>
+  <div class="footer-links">
+    <a href="#hero">Top ↑</a>
+    <a href="https://github.com/naren-ghub" target="_blank">GitHub</a>
+    <a href="https://modal.com" target="_blank">Powered by Modal</a>
+  </div>
+</footer>
+
+<script>
+// Navbar shadow on scroll
+const nav = document.getElementById('navbar');
+window.addEventListener('scroll', () => {
+  nav.classList.toggle('scrolled', window.scrollY > 20);
+});
+
+// Scroll reveal
+const observer = new IntersectionObserver(
+  entries => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); }),
+  { threshold: 0.12 }
+);
+document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
