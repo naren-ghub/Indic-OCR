@@ -1,0 +1,23 @@
+# Phase 2 — Hardened Pipeline Dependencies
+
+# --- Transformers & ByT5 Correction ---
+transformers<5.0.0,>=4.56.1
+torch>=2.2.0
+sentencepiece
+huggingface_hub
+
+# --- Evaluation & Metrics ---
+jiwer>=3.0.0
+evaluate
+
+# --- Data / Corpus download ---
+datasets>=2.18.0
+requests>=2.31.0
+
+# --- OCR & Vision ---
+surya-ocr>=0.4.14
+PyMuPDF>=1.23.0
+opencv-python
+pillow
+numpy
+tqdm

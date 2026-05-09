@@ -1,0 +1,37 @@
+# Python environments
+.venv/
+.venv_byt5/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Output and temp files
+*.pdf
+*.txt
+!requirements.txt
+!README.md
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.sqlite
+*.bak
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+
+# Deployment and secrets
+.env
+secret_key
+__target__/
+__pycache__/
+
+# Modal temp
+.modal/
+
+# AI Artifacts
+*.md.metadata.json
+*.md.resolved

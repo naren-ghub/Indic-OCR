@@ -1,0 +1,25 @@
+{
+  "total_pairs": 75000,
+  "sources": {
+    "premodern": 20250,
+    "project_madurai": 24750,
+    "indiccorp": 30000
+  },
+  "char_length": {
+    "min": 20,
+    "max": 340,
+    "mean": 114.1,
+    "median": 102.0
+  },
+  "byte_length": {
+    "min": 30,
+    "max": 968,
+    "mean": 310.9,
+    "median": 276.0
+  },
+  "avg_edits_per_example": 4.2,
+  "fits_in_512_bytes": 62504,
+  "fits_in_1024_bytes": 75000,
+  "html_tag_injected": 8122,
+  "html_tag_injected_pct": 10.8
+}

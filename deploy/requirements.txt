@@ -1,0 +1,21 @@
+# Indian OCR — HF Spaces Dependencies
+# Core OCR
+surya-ocr>=0.4.14
+PyMuPDF>=1.23.0
+
+# UI
+gradio>=6.14.0
+
+# Metrics
+jiwer>=3.0.0
+
+# Image processing
+pillow
+numpy
+opencv-python
+
+# DOCX support
+python-docx
+
+# Deep learning (Surya dependency)
+torch>=2.2.0
