@@ -1,89 +1,26 @@
 """
-Indic OCR — Multilingual Document Digitization
-Supports: PDF (up to 100 pages), Image files (.png, .jpg, .tiff, .bmp), DOCX files.
-Powered by Surya OCR with layout-aware text reconstruction.
+Indic OCR — Multilingual Document Digitization (Gradio UI)
+==========================================================
+This file contains ONLY the Gradio frontend UI.
+All heavy AI model logic runs on a separate GPU container via Modal.
+
+When deployed on Modal, this runs on a cheap CPU-only container.
+When the user clicks "Run OCR", it calls the GPU function remotely.
 """
-import re
-import unicodedata
-import sys
-import io
+import json
 import os
-import tempfile
+import sys
 from pathlib import Path
 
 import gradio as gr
-from PIL import Image
 
-# ── Project root on sys.path so pipeline imports work ──────────────────────
+# ── Project root on sys.path ──────────────────────────────────────────────
 ROOT = Path(__file__).parent
-# Phase 2 pipeline: check both local layout (ROOT.parent) and bundled layout (ROOT subdirectory)
-# This allows the same code to run locally AND inside the Modal container.
-_phase2_local  = ROOT.parent / "OCR_Phase_2"   # local: NLP Projects/OCR_Phase_2
-_phase2_bundle = ROOT / "OCR_Phase_2"           # container: /root/deploy/OCR_Phase_2
-PHASE2_ROOT = _phase2_bundle if _phase2_bundle.exists() else _phase2_local
-sys.path.insert(0, str(PHASE2_ROOT))
 
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8")
 
-# ── Optional imports (metrics) ──────────────────────────────────────────────
-try:
-    import jiwer
-except Exception:
-    jiwer = None
-
-# ── Lazy imports for optional formats ──────────────────────────────────────
-def _import_fitz():
-    import fitz
-    return fitz
-
-def _import_docx():
-    import docx
-    return docx
-
-# ── Pipeline imports ───────────────────────────────────────────────────────
-from pipeline.ocr_engine import SuryaEngine, create_engine
-from pipeline.layout_engine import LayoutEngine
-from pipeline.text_cleaner import clean_text as _deep_clean
-
-MAX_PAGES = 100
-SUPPORTED_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp", ".webp"}
-
-# ── Short-line reflow ─────────────────────────────────────────────────────
-# When the layout engine detects narrow text columns or fragmented bounding
-# boxes, it may output very short lines that are really continuation fragments
-# of the surrounding paragraph (e.g. a single word on its own line).
-# This function joins such orphan lines back to the previous paragraph.
-_REFLOW_THRESHOLD = 18  # lines shorter than this (in chars) get merged
-
-def _reflow_text(text: str) -> str:
-    """Merge short orphan lines into the previous paragraph."""
-    lines = text.splitlines()
-    merged: list[str] = []
-    for line in lines:
-        stripped = line.strip()
-        if not stripped:
-            # Blank line — preserve as paragraph separator
-            merged.append("")
-        elif merged and stripped and len(stripped) < _REFLOW_THRESHOLD and not merged[-1] == "":
-            # Short non-empty line following non-empty content → append to previous
-            merged[-1] = merged[-1] + " " + stripped
-        else:
-            merged.append(stripped)
-    # Collapse consecutive blank lines into one
-    result: list[str] = []
-    prev_blank = False
-    for line in merged:
-        if line == "":
-            if not prev_blank:
-                result.append("")
-            prev_blank = True
-        else:
-            result.append(line)
-            prev_blank = False
-    return "\n".join(result).strip()
-
-# ── Supported languages ───────────────────────────────────────────────────
+# ── Supported languages (UI-only, no model imports needed) ────────────────
 LANGUAGE_OPTIONS = {
     "Tamil (தமிழ்)": "ta",
     "Hindi (हिन्दी)": "hi",
@@ -98,202 +35,22 @@ LANGUAGE_OPTIONS = {
     "English": "en",
 }
 
-# ── Load models once at startup ────────────────────────────────────────────
-import torch as _torch
-_DEVICE = "cuda" if _torch.cuda.is_available() else "cpu"
-print(f"Loading Surya OCR models on {_DEVICE}… (first run takes ~10s)")
-from surya.foundation import FoundationPredictor
-fp = FoundationPredictor(device=_DEVICE)
-# Engine will be re-created per request with the selected language
-layout_engine = LayoutEngine(foundation_predictor=fp)
-print("Models ready ✓")
-
 # Logo path
 LOGO_PATH = str(ROOT / "indian_ocr_logo.png")
 
-
-# ── File → List[PIL.Image] converters ─────────────────────────────────────
-
-def load_pdf(path: str) -> list[Image.Image]:
-    fitz = _import_fitz()
-    doc = fitz.open(path)
-    total = len(doc)
-    if total > MAX_PAGES:
-        raise ValueError(
-            f"PDF has {total} pages. Maximum allowed is {MAX_PAGES}. "
-            f"Please upload a shorter document."
-        )
-    images = []
-    for page_num in range(total):
-        page = doc[page_num]
-        embedded = page.get_images(full=True)
-        text_len = len(page.get_text("text").strip())
-        if len(embedded) == 1 and text_len == 0:
-            # Pure scan → extract image directly (best quality)
-            xref = embedded[0][0]
-            base = doc.extract_image(xref)
-            img = Image.open(io.BytesIO(base["image"])).convert("RGB")
-        else:
-            # Text-based or mixed → render at 300 DPI
-            pix = page.get_pixmap(dpi=300)
-            img = Image.open(io.BytesIO(pix.tobytes("png"))).convert("RGB")
-        images.append((page_num + 1, img))
-    doc.close()
-    return images
+# Demo file paths
+DEMO_PDF_PATH = str(ROOT.parent / "OCR" / "OCR_dataset" / "எலி.pdf")
+if not Path(DEMO_PDF_PATH).exists():
+    DEMO_PDF_PATH = str(ROOT / "OCR_dataset" / "எலி.pdf")
+DEMO_GT_PATH = str(ROOT / "OCR_dataset" / "எலி_ground_truth.txt")
 
 
-def load_image_file(path: str) -> list[tuple[int, Image.Image]]:
-    img = Image.open(path).convert("RGB")
-    return [(1, img)]
-
-
-def load_docx(path: str) -> list[tuple[int, Image.Image]]:
-    """
-    DOCX: extract embedded images in order and treat each as a page.
-    """
-    docx = _import_docx()
-    doc = docx.Document(path)
-
-    images = []
-    for rel in doc.part.rels.values():
-        if "image" in rel.reltype:
-            img_bytes = rel.target_part.blob
-            try:
-                img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-                images.append(img)
-            except Exception:
-                pass
-
-    if not images:
-        raise ValueError(
-            "This DOCX contains no embedded images. "
-            "For text-only DOCX files, please copy the text directly — "
-            "OCR is only needed for scanned/image content."
-        )
-
-    if len(images) > MAX_PAGES:
-        raise ValueError(
-            f"DOCX contains {len(images)} images. Maximum allowed is {MAX_PAGES}."
-        )
-
-    return [(i + 1, img) for i, img in enumerate(images)]
-
-
-# ── Metrics helpers ────────────────────────────────────────────────────────
-
-def _normalize_for_metrics(text: str) -> str:
-    """
-    Strip structural OCR output artifacts before CER/WER comparison so that
-    layout formatting does not inflate error rates against clean ground-truth text.
-    Removes: OCR file header lines, ===separator lines, PAGE N headers,
-    standalone page numbers, ### markdown headers, and single-char fragments.
-    Also applies Unicode NFC normalization for consistent Indic script comparison.
-    """
-    if not text:
-        return ""
-    # Strip BOM if present
-    text = text.lstrip('\ufeff')
-    lines = text.splitlines()
-    cleaned = []
-    for line in lines:
-        s = line.strip()
-        # Skip OCR output file header lines (e.g. 'Indic OCR Output — ...')
-        if re.match(r'^Indic OCR Output', s): continue
-        if re.match(r'^Languages:', s): continue
-        if re.match(r'^Pages processed:', s): continue
-        if re.match(r'^Tamil OCR Output', s): continue
-        # Skip === separator lines
-        if re.match(r'^=+$', s): continue
-        # Skip PAGE N header lines
-        if re.match(r'^PAGE\s+\d+', s): continue
-        # Skip standalone page numbers
-        if re.match(r'^\d{1,4}$', s): continue
-        # Skip markdown headers that crept in
-        if re.match(r'^#+\s', s): continue
-        # Skip single/double-char layout fragment lines
-        if len(s) <= 2 and s: continue
-        cleaned.append(s)
-    joined = ' '.join(' '.join(cleaned).split())
-    # NFC normalize for consistent Indic script comparison
-    return unicodedata.normalize('NFC', joined)
-
-
-def _maybe_load_reference_text(
-    doc_path: str,
-    doc_ext: str,
-    reference_text: str | None,
-    reference_file_path: str | None,
-) -> tuple[str | None, str]:
-    """
-    Returns: (reference_text_or_none, reference_source_label)
-    """
-    if reference_file_path:
-        try:
-            with open(reference_file_path, "r", encoding="utf-8") as f:
-                txt = f.read()
-            txt = txt.strip()
-            if txt:
-                return txt, "user-provided reference file"
-        except Exception:
-            pass
-
-    if reference_text and reference_text.strip():
-        return reference_text.strip(), "user-provided reference text"
-
-    if doc_ext == ".pdf":
-        # Best-effort: use embedded selectable text as reference, if present.
-        try:
-            fitz = _import_fitz()
-            pdf = fitz.open(doc_path)
-            parts: list[str] = []
-            for page in pdf:
-                parts.append(page.get_text("text", sort=True) or "")
-            pdf.close()
-            embedded = "\n".join(parts).strip()
-            if embedded:
-                return embedded, "embedded PDF text (best-effort)"
-        except Exception:
-            pass
-
-    return None, "no reference available"
-
-
-def _format_report_md(
-    filename: str,
-    total_pages: int,
-    output_filename: str,
-    cer: float | None,
-    wer: float | None,
-    reference_source: str,
-    selected_langs: str,
-    metrics_note: str | None = None,
-) -> str:
-    cer_str = f"{cer:.2%}" if cer is not None else "N/A"
-    wer_str = f"{wer:.2%}" if wer is not None else "N/A"
-
-    extra = f"\n\n{metrics_note}" if metrics_note else ""
-    return (
-        "### 📊 Run Report\n\n"
-        f"| Property | Value |\n"
-        f"|---|---|\n"
-        f"| **File** | `{filename}` |\n"
-        f"| **Pages processed** | {total_pages} |\n"
-        f"| **Languages** | {selected_langs} |\n"
-        f"| **Output** | `{output_filename}` |\n"
-        f"| **Reference** | {reference_source} |\n"
-        f"| **CER** | {cer_str} |\n"
-        f"| **WER** | {wer_str} |\n"
-        "\n"
-        "> **CER** measures character-level accuracy. **WER** measures word-level accuracy. Lower is better.\n"
-        f"{extra}"
-    )
-
-
-# ── Core processing function ───────────────────────────────────────────────
+# ── Core processing function (thin wrapper → GPU remote call) ─────────────
 
 def run_ocr(file_obj, selected_languages, reference_text: str | None, reference_file_path: str | None):
     """
-    Main Gradio callback.
+    Main Gradio callback. Reads the file into bytes, calls the GPU
+    container via Modal's remote_gen(), and streams progress back to the UI.
     """
     if file_obj is None:
         yield "⚠️ Upload a file to begin.", "", None, ""
@@ -304,174 +61,65 @@ def run_ocr(file_obj, selected_languages, reference_text: str | None, reference_
         yield "❌ Could not read uploaded file path.", "", None, ""
         return
 
-    ext = Path(path).suffix.lower()
+    file_name = Path(path).name
+    file_ext = Path(path).suffix.lower()
 
     # ── Resolve selected languages ──────────────────────────────────────
     if not selected_languages:
         selected_languages = ["Tamil (தமிழ்)"]
     lang_codes = [LANGUAGE_OPTIONS.get(l, "ta") for l in selected_languages]
-    # Always include English for mixed-script documents
     if "en" not in lang_codes:
         lang_codes.append("en")
     lang_label = ", ".join(selected_languages)
 
-    # Create OCR engine with selected languages
-    engine = create_engine("surya", langs=lang_codes, device="cuda", foundation_predictor=fp)
+    # ── Read file bytes to pass to GPU container ────────────────────────
+    with open(path, "rb") as f:
+        file_bytes = f.read()
 
-    # ── Load pages ──────────────────────────────────────────────────────
+    # ── Read reference file bytes if provided ───────────────────────────
+    reference_file_bytes = None
+    if reference_file_path:
+        try:
+            with open(reference_file_path, "rb") as f:
+                reference_file_bytes = f.read()
+        except Exception:
+            pass
+
+    # ── Show "Waking up GPU" status ─────────────────────────────────────
+    yield "⏳ Waking up GPU… (~15 seconds on first use)", "Connecting to GPU server…", None, ""
+
+    # ── Call the GPU function remotely ──────────────────────────────────
+    import modal
+    run_ocr_gpu = modal.Function.from_name("indic-ocr", "run_ocr_gpu")
+
     try:
-        if ext == ".pdf":
-            pages = load_pdf(path)
-        elif ext in SUPPORTED_IMAGE_EXTS:
-            pages = load_image_file(path)
-        elif ext in {".docx", ".doc"}:
-            pages = load_docx(path)
-        else:
-            yield (
-                f"❌ Unsupported file type: '{ext}'. "
-                "Supported: PDF, PNG, JPG, TIFF, BMP, WEBP, DOCX"
-            ), "", None, ""
-            return
-    except ValueError as e:
-        yield f"❌ {e}", "", None, ""
-        return
+        for event_json in run_ocr_gpu.remote_gen(
+            file_bytes=file_bytes,
+            file_name=file_name,
+            file_ext=file_ext,
+            lang_codes=lang_codes,
+            lang_label=lang_label,
+            reference_text=reference_text if reference_text else None,
+            reference_file_bytes=reference_file_bytes,
+        ):
+            event = json.loads(event_json)
+
+            if event["type"] == "progress":
+                yield event["status"], event["log"], None, ""
+
+            elif event["type"] == "done":
+                # The output .txt is on the shared volume at /tmp/gradio/
+                output_path = event.get("output_path")
+                yield event["status"], event["log"], output_path, event["report"]
+
+            elif event["type"] == "error":
+                yield f"❌ {event['message']}", event.get("log", ""), None, ""
+
     except Exception as e:
-        yield f"❌ Error loading file: {e}", "", None, ""
-        return
-
-    total_pages = len(pages)
-    log_lines = [f"📄 Loaded {total_pages} page(s) from '{Path(path).name}'"]
-    log_lines.append(f"🌐 Languages: {lang_label}")
-    log_lines.append("")
-    report_md = ""
-    spinner = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
-    spin_i = 0
-    status = f"{spinner[spin_i]} Ready…"
-    yield status, "\n".join(log_lines), None, report_md
-
-    ref_text, ref_source = _maybe_load_reference_text(
-        doc_path=path,
-        doc_ext=ext,
-        reference_text=reference_text,
-        reference_file_path=reference_file_path,
-    )
-
-    all_text_parts = []
-    pred_pages_for_metrics: list[str] = []
-
-    # ── OCR and Layout processing ───────────────────────────────────────────
-    for page_num, img in pages:
-        spin_i = (spin_i + 1) % len(spinner)
-        status = f"{spinner[spin_i]} Processing page {page_num}/{total_pages}…"
-        log_lines.append(f"🔍 Page {page_num}/{total_pages}: OCR…")
-        yield status, "\n".join(log_lines), None, report_md
-        try:
-            result = engine.process_image(img)
-            ocr_lines = result.get("lines", [])
-            lines_count = len(ocr_lines)
-
-            spin_i = (spin_i + 1) % len(spinner)
-            status = f"{spinner[spin_i]} Layout filtering…"
-            log_lines.append(f"   🧩 Layout filter…")
-            yield status, "\n".join(log_lines), None, report_md
-
-            layout = layout_engine.analyze_page(img, page_num=page_num)
-            text = LayoutEngine.reconstruct_page_text(ocr_lines, layout)
-
-            spin_i = (spin_i + 1) % len(spinner)
-            status = f"{spinner[spin_i]} Cleaning…"
-            yield status, "\n".join(log_lines), None, report_md
-
-            text = _deep_clean(text)
-            text = _reflow_text(text)  # merge orphan short lines into paragraphs
-
-            all_text_parts.append(
-                f"{'='*60}\n"
-                f"PAGE {page_num}\n"
-                f"{'='*60}\n"
-                f"{text}\n"
-            )
-            pred_pages_for_metrics.append(text)
-            log_lines.append(
-                f"   ✅ {lines_count} lines extracted"
-            )
-            spin_i = (spin_i + 1) % len(spinner)
-            status = f"{spinner[spin_i]} Page {page_num} done"
-            yield status, "\n".join(log_lines), None, report_md
-        except Exception as e:
-            log_lines.append(f"   ❌ Page {page_num} failed: {e}")
-            all_text_parts.append(
-                f"{'='*60}\nPAGE {page_num}\n{'='*60}\n[OCR ERROR: {e}]\n"
-            )
-            pred_pages_for_metrics.append("")
-            spin_i = (spin_i + 1) % len(spinner)
-            status = f"{spinner[spin_i]} Error on page {page_num}"
-            yield status, "\n".join(log_lines), None, report_md
-
-    # ── Write output .txt ───────────────────────────────────────────────
-    output_filename = Path(path).stem + "_ocr_output.txt"
-    tmp_dir = tempfile.mkdtemp()
-    output_path = os.path.join(tmp_dir, output_filename)
-
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(f"Indic OCR Output — {Path(path).name}\n")
-        f.write(f"Languages: {lang_label}\n")
-        f.write(f"Pages processed: {total_pages}\n")
-        f.write("=" * 60 + "\n\n")
-        f.write("\n".join(all_text_parts))
-
-    # ── Compute CER/WER (best-effort) ───────────────────────────────────
-    cer = None
-    wer = None
-    metrics_note = None
-
-    pred_full = _normalize_for_metrics("\n".join(pred_pages_for_metrics))
-    ref_full = _normalize_for_metrics(ref_text) if ref_text else ""
-
-    if ref_full and jiwer is None:
-        metrics_note = (
-            "> Note: `jiwer` is not available in this environment, so CER/WER could not be computed.\n"
-            "> Install it with `pip install jiwer`."
-        )
-    elif ref_full:
-        try:
-            cer = float(jiwer.cer(ref_full, pred_full))
-            wer = float(jiwer.wer(ref_full, pred_full))
-        except Exception as e:
-            metrics_note = f"> Note: CER/WER computation failed: `{e}`"
-    else:
-        metrics_note = (
-            "> Note: CER/WER require a reference text. Provide one (paste or upload a `.txt`),\n"
-            "> or use a PDF that contains selectable text."
-        )
-
-    report_md = _format_report_md(
-        filename=Path(path).name,
-        total_pages=total_pages,
-        output_filename=output_filename,
-        cer=cer,
-        wer=wer,
-        reference_source=ref_source,
-        selected_langs=lang_label,
-        metrics_note=metrics_note,
-    )
-
-    log_lines.append("")
-    log_lines.append(f"✅ Done! {total_pages} page(s) processed.")
-    log_lines.append("📥 Download is ready.")
-
-    status = "✅ Completed"
-    yield status, "\n".join(log_lines), output_path, report_md
+        yield f"❌ GPU error: {e}", f"Error communicating with GPU server:\n{e}", None, ""
 
 
 # ── Gradio UI ──────────────────────────────────────────────────────────────
-
-# Demo file paths
-DEMO_PDF_PATH = str(ROOT.parent / "OCR" / "OCR_dataset" / "எலி.pdf")
-if not Path(DEMO_PDF_PATH).exists():
-    DEMO_PDF_PATH = str(ROOT / "OCR_dataset" / "எலி.pdf")
-DEMO_GT_PATH  = str(ROOT / "OCR_dataset" / "எலி_ground_truth.txt")
-
 
 CUSTOM_CSS = """
 /* ── Global ─────────────────────────────────────────────────────── */
