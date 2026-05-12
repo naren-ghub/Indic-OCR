@@ -665,41 +665,36 @@ code{font-family:'JetBrains Mono',monospace;font-size:.82rem;
   <div class="blob" style="top:-5%;right:-5%;width:500px;height:500px;background:radial-gradient(var(--purple),transparent);opacity:.15;"></div>
   <span class="tag">Future Scope</span>
   <h2>Neural Language Correction — <span class="grad2-text">ByT5</span></h2>
-  <p style="margin-top:8px;max-width:700px;">The next planned upgrade: a character-level Language Model correction pass that fixes residual OCR errors the Vision model couldn't catch. <strong>Not implemented in the current deployment.</strong></p>
+  <p style="margin-top:8px;max-width:740px;">The next planned upgrade: a character-level Language Model pass that fixes residual OCR errors the Vision model couldn't catch. <strong>Not implemented in the current deployment.</strong></p>
 
-  <div class="grid-2" style="margin-top:22px;">
-    <div style="display:flex;flex-direction:column;gap:12px;">
-      <div class="card purple-glow">
-        <h3>🔬 Why ByT5?</h3>
-        <ul style="margin-top:10px;font-size:.84rem;display:flex;flex-direction:column;gap:7px;">
-          <li>Standard LLMs use <strong>subword tokenizers</strong> — a single OCR typo fragments a Tamil word into unrecognizable pieces</li>
-          <li><strong>ByT5 operates on raw UTF-8 bytes</strong> — every character is its own token. No vocabulary mismatch possible.</li>
-          <li>Uniquely suited to surgically fix character-level OCR garbling in Indic scripts</li>
-        </ul>
-      </div>
-      <div class="card blue-glow">
-        <h3>⚗️ Fine-tuning Done (Research Phase)</h3>
-        <ul style="margin-top:10px;font-size:.84rem;display:flex;flex-direction:column;gap:7px;">
-          <li><strong>Dataset</strong>: <code>Naren-hug/tamil-ocr-byt5-dataset</code> — 10,000 synthetic noise pairs</li>
-          <li><strong>Hardware</strong>: Kaggle T4×2 GPUs, fp16, Adafactor optimizer</li>
-          <li><strong>Result</strong>: Validation CER of <strong>9.84%</strong> (Epoch 4, best checkpoint)</li>
-          <li><strong>Weights</strong>: <code>Naren-hug/byt5-tamil-ocr-v1</code> on HuggingFace</li>
-        </ul>
-      </div>
+  <div class="grid-3" style="margin-top:28px;">
+    <div class="card purple-glow">
+      <h3>🔬 Why ByT5?</h3>
+      <ul style="margin-top:10px;font-size:.84rem;display:flex;flex-direction:column;gap:8px;">
+        <li>Standard LLMs use <strong>subword tokenizers</strong> — a single OCR typo fragments a Tamil word into unrecognizable pieces</li>
+        <li><strong>ByT5 operates on raw UTF-8 bytes</strong> — every character is its own token, with no vocabulary mismatch possible</li>
+        <li>Uniquely suited to surgically fix character-level OCR garbling in complex Indic scripts</li>
+      </ul>
     </div>
-    <div style="display:flex;flex-direction:column;gap:12px;">
-      <div class="card orange-glow">
-        <h3>⚠️ Current Blocker</h3>
-        <p style="font-size:.84rem;margin-top:8px;">The model was trained with <code>transformers==5.8.0</code> (Kaggle). Surya OCR requires <code>transformers==4.57.6</code>. Loading ByT5 locally with 4.x produces garbage output — the byte-to-token mapping differs between major versions.</p>
-        <p style="font-size:.83rem;margin-top:8px;color:var(--orange);">Solution: Run ByT5 in an <strong>isolated subprocess</strong> (<code>LMCorrector</code> class) using a separate <code>.venv_byt5</code> with the correct transformers version.</p>
-      </div>
-      <div class="card green-glow">
-        <h3>🎯 Surgical Correction Strategy</h3>
-        <ul style="margin-top:10px;font-size:.84rem;display:flex;flex-direction:column;gap:7px;">
-          <li>Only route lines with <strong>confidence &lt; 0.90</strong> through ByT5 — high-confidence lines are left untouched for throughput</li>
-          <li>Lines containing <strong>known noise patterns</strong> (HTML tags, pipes) also get corrected regardless of confidence</li>
-          <li>Expected CER improvement: <strong>7% → ~4%</strong> on clean print</li>
-        </ul>
+    <div class="card blue-glow">
+      <h3>🎯 Correction Strategy</h3>
+      <ul style="margin-top:10px;font-size:.84rem;display:flex;flex-direction:column;gap:8px;">
+        <li>Only route lines with <strong>confidence &lt; 0.90</strong> through ByT5 — high-confidence lines are left untouched for throughput</li>
+        <li>Lines with <strong>known noise patterns</strong> (HTML tags, pipes, underscore runs) also get corrected regardless of score</li>
+        <li>Runs as an isolated post-processing step — does not alter the core OCR pipeline</li>
+      </ul>
+    </div>
+    <div class="card green-glow">
+      <h3>📈 Expected Impact</h3>
+      <ul style="margin-top:10px;font-size:.84rem;display:flex;flex-direction:column;gap:8px;">
+        <li>Target CER improvement: <strong>~7% → ~4%</strong> on clean modern print</li>
+        <li>Stronger gains expected on degraded archival prints where Surya leaves more residual errors</li>
+        <li>Model: <code>google/byt5-small</code> — compact enough for T4 inference alongside Surya</li>
+      </ul>
+      <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
+        <span class="chip purple">Planned</span>
+        <span class="chip blue">Tamil first</span>
+        <span class="chip green">All 11 langs next</span>
       </div>
     </div>
   </div>
