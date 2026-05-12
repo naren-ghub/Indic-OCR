@@ -187,34 +187,32 @@ code{font-family:'JetBrains Mono',monospace;font-size:.82rem;
   <div class="blob" style="top:-10%;right:0;width:400px;height:400px;background:radial-gradient(var(--red),transparent);opacity:.12;"></div>
   <span class="tag">Motivation</span>
   <h2>Why is Indic OCR <span class="grad-text">Hard?</span></h2>
-  <p style="margin-top:10px;max-width:700px;">Traditional OCR systems like Tesseract were built for Latin scripts. Indic languages break every assumption they make.</p>
+  <p style="margin-top:10px;max-width:700px;">Traditional OCR like Tesseract works like a <strong>photocopier that reads letter-by-letter</strong>. Indic scripts don't work that way — and they break it completely.</p>
 
-  <div class="grid-2" style="margin-top:28px;">
+  <div class="grid-2" style="margin-top:24px;">
     <div class="card" style="border-color:rgba(239,68,68,.3);">
-      <h3>❌ The Old Approach Fails Because...</h3>
-      <ul style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
-        <li>Indic scripts use <strong>akshara clusters</strong> — multiple Unicode codepoints fuse into one visual unit</li>
-        <li>Tesseract binarizes images, destroying <strong>vowel mark hairlines</strong></li>
-        <li>Column layout interleaving produces <strong>garbled reading order</strong></li>
-        <li>No built-in way to separate <strong>body text from headers/footers</strong></li>
-        <li>Completely fails on <strong>degraded archival prints</strong> (≥40% CER)</li>
+      <h3>❌ Why Traditional OCR Fails</h3>
+      <ul style="margin-top:10px;display:flex;flex-direction:column;gap:9px;">
+        <li>Tamil/Telugu letters <strong>fuse together visually</strong> — one "letter" on screen is actually 3–4 Unicode symbols combined. Tesseract slices right through the middle and reads garbage.</li>
+        <li>Traditional OCR <strong>converts images to black &amp; white</strong> before reading. The tiny hairline strokes that distinguish vowel marks in Tamil get erased in this step.</li>
+        <li>Newspaper pages have <strong>2–3 columns</strong>. Without layout awareness, the text comes out interleaved — col-A line 1, col-B line 1, col-A line 2... completely unreadable.</li>
+        <li>No understanding of <strong>what is body text vs page header/footer</strong> — all noise gets included.</li>
       </ul>
     </div>
     <div class="card blue-glow">
-      <h3>✅ What We Do Instead</h3>
-      <ul style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
-        <li>Use a <strong>Vision Transformer</strong> that reads the whole line as an image — no fixed vocabulary</li>
-        <li>Keep images in <strong>full RGB colour</strong> — no binarization</li>
-        <li>Apply <strong>Recursive X-Y Cut</strong> to reconstruct correct reading order geometrically</li>
-        <li>Detect and <strong>prune structural blocks</strong> (PageHeader, PageFooter) before assembly</li>
-        <li>Apply <strong>Unicode NFC normalization</strong> to fix invisible encoding bugs</li>
+      <h3>✅ How AI Solves This</h3>
+      <ul style="margin-top:10px;display:flex;flex-direction:column;gap:9px;">
+        <li>Our Vision Transformer <strong>looks at the entire line as a picture</strong> and directly types out the characters — like a skilled human typist, not a letter-by-letter scanner.</li>
+        <li>We <strong>never convert to black &amp; white</strong>. The model trained on full-colour images and relies on subtle greys to distinguish vowel marks.</li>
+        <li>A geometric algorithm (<strong>X-Y Cut</strong>) traces the invisible column boundaries and reads left column top-to-bottom first, then right column — exactly as a human would.</li>
+        <li>An AI <strong>layout classifier</strong> labels every region (Body, Header, Footer, Image) so we only extract actual content.</li>
       </ul>
     </div>
   </div>
 
-  <div style="margin-top:24px;display:flex;gap:14px;flex-wrap:wrap;">
-    <span class="chip red">Tesseract CER: ~40% on archives</span>
-    <span class="chip green">Surya CER: ~7% on modern print</span>
+  <div style="margin-top:20px;display:flex;gap:14px;flex-wrap:wrap;">
+    <span class="chip red">Tesseract: ~40% error rate on archives</span>
+    <span class="chip green">Our system: ~7% error rate on modern print</span>
     <span class="chip blue">11 Indic Languages Supported</span>
   </div>
 </div>
@@ -224,48 +222,48 @@ code{font-family:'JetBrains Mono',monospace;font-size:.82rem;
 ════════════════════════════════════════════════ -->
 <div class="slide" id="s3">
   <span class="tag">System Design</span>
-  <h2>5-Stage <span class="grad-text">Pipeline</span> Architecture</h2>
-  <p style="margin-top:8px;max-width:680px;">Every document flows through five deterministic stages. Each stage solves one specific problem and passes a clean artifact to the next.</p>
+  <h2>5-Stage <span class="grad-text">Pipeline</span> — How It Flows</h2>
+  <p style="margin-top:8px;max-width:680px;">Think of it like a <strong>document assembly line</strong>. Your PDF enters one end. At each station, one specific job is done. Clean text comes out the other end.</p>
 
-  <div class="pipe-row" style="margin-top:32px;">
+  <div class="pipe-row" style="margin-top:28px;">
     <div class="pipe-box" style="border-color:rgba(6,182,212,.4);color:#67e8f9;">
-      📥<br>Stage 1<br><span style="font-weight:400;color:var(--muted);font-size:.75rem;">Document Ingestion</span>
+      📥<br>Stage 1<br><span style="font-weight:400;color:var(--muted);font-size:.75rem;">Convert to Images</span>
     </div>
     <div class="pipe-arrow">→</div>
     <div class="pipe-box" style="border-color:rgba(59,130,246,.4);color:#93c5fd;">
-      🔍<br>Stage 2<br><span style="font-weight:400;color:var(--muted);font-size:.75rem;">Surya ViT OCR</span>
+      👁️<br>Stage 2<br><span style="font-weight:400;color:var(--muted);font-size:.75rem;">AI Reads Each Line</span>
     </div>
     <div class="pipe-arrow">→</div>
     <div class="pipe-box" style="border-color:rgba(139,92,246,.4);color:#c4b5fd;">
-      🧩<br>Stage 3<br><span style="font-weight:400;color:var(--muted);font-size:.75rem;">Layout Detection</span>
+      🧩<br>Stage 3<br><span style="font-weight:400;color:var(--muted);font-size:.75rem;">Understand Layout</span>
     </div>
     <div class="pipe-arrow">→</div>
     <div class="pipe-box" style="border-color:rgba(139,92,246,.4);color:#c4b5fd;">
-      📐<br>Stage 4<br><span style="font-weight:400;color:var(--muted);font-size:.75rem;">X-Y Cut Ordering</span>
+      📐<br>Stage 4<br><span style="font-weight:400;color:var(--muted);font-size:.75rem;">Fix Reading Order</span>
     </div>
     <div class="pipe-arrow">→</div>
     <div class="pipe-box" style="border-color:rgba(16,185,129,.4);color:#6ee7b7;">
-      ✨<br>Stage 5<br><span style="font-weight:400;color:var(--muted);font-size:.75rem;">NLP Refinement</span>
+      ✨<br>Stage 5<br><span style="font-weight:400;color:var(--muted);font-size:.75rem;">Clean &amp; Output</span>
     </div>
   </div>
 
-  <div class="grid-3" style="margin-top:28px;">
+  <div class="grid-3" style="margin-top:24px;">
     <div class="card cyan-glow">
       <strong style="font-size:.82rem;color:#67e8f9;">INPUT</strong>
-      <p style="margin-top:6px;font-size:.85rem;">PDF (up to 100 pages), PNG/JPG/TIFF/BMP/WEBP image, or DOCX</p>
+      <p style="margin-top:6px;font-size:.85rem;">Any scanned document: PDF (up to 100 pages), PNG/JPG/TIFF image, or a Word DOCX file with embedded images.</p>
     </div>
     <div class="card blue-glow">
       <strong style="font-size:.82rem;color:#93c5fd;">PROCESSING</strong>
-      <p style="margin-top:6px;font-size:.85rem;">GPU-accelerated Vision Transformer inference on NVIDIA T4 (2–5s/page)</p>
+      <p style="margin-top:6px;font-size:.85rem;">An AI Vision model on a cloud GPU reads every text line. It takes roughly <strong>2–5 seconds per page</strong> on an NVIDIA T4 GPU.</p>
     </div>
     <div class="card green-glow">
       <strong style="font-size:.82rem;color:#6ee7b7;">OUTPUT</strong>
-      <p style="margin-top:6px;font-size:.85rem;">Clean UTF-8 text, layout-preserved, with optional CER/WER accuracy report</p>
+      <p style="margin-top:6px;font-size:.85rem;">A clean, downloadable <strong>.txt file</strong> with the text in the correct reading order, ready to search, copy, or feed into other tools.</p>
     </div>
   </div>
 
-  <div style="margin-top:24px;" class="card" style="border-color:rgba(245,158,11,.3);">
-    <p style="font-size:.85rem;"><strong>Deployment:</strong> CPU container serves the Gradio UI (free). GPU container cold-starts <em>only</em> when the user clicks "Run OCR" — then scales back to $0. Built on <strong>Modal.com serverless</strong>.</p>
+  <div style="margin-top:18px;" class="card" style="border-color:rgba(245,158,11,.3);">
+    <p style="font-size:.85rem;"><strong>Cost trick:</strong> The website (UI) runs always-on on a cheap CPU server. The expensive GPU only switches on when you click "Run OCR" — and switches off the moment it’s done. <strong>Zero idle cost.</strong></p>
   </div>
 </div>
 
@@ -336,28 +334,28 @@ code{font-family:'JetBrains Mono',monospace;font-size:.82rem;
 ════════════════════════════════════════════════ -->
 <div class="slide" id="s5">
   <span class="tag">Stage 1</span>
-  <h2>Document <span class="grad-text">Ingestion</span> & Pre-processing</h2>
-  <p style="margin-top:8px;max-width:700px;">The pipeline accepts three document types and converts every page to a high-fidelity RGB PIL Image before any AI model touches it.</p>
+  <h2>Document <span class="grad-text">Ingestion</span> — Converting to Images</h2>
+  <p style="margin-top:8px;max-width:700px;">Before any AI touches the document, we convert every page into a raw pixel image. Think of it as <strong>"photographing" each page</strong> so the model can see it clearly — just like a human would look at a physical document.</p>
 
   <div class="grid-3" style="margin-top:24px;">
     <div class="card cyan-glow">
       <h3>📄 PDF Files</h3>
-      <p style="font-size:.85rem;margin-top:8px;">Opens with <code>fitz.open()</code>. For pages with a single embedded image and no selectable text, we extract the raw bitmap directly with <code>doc.extract_image()</code> — <strong>bypassing JPEG recompression</strong>. For layered PDFs, we rasterize at <strong>300 DPI</strong> for maximum detail.</p>
+      <p style="font-size:.85rem;margin-top:8px;">We open the PDF and handle two cases: if a page is just a <strong>scanned photo embedded inside</strong>, we pull the raw image out directly (no quality loss). If the PDF has mixed text and graphics, we <strong>re-render the page at 300 DPI</strong> — high enough to keep even the finest vowel mark hairlines sharp.</p>
       <p style="font-size:.8rem;margin-top:10px;color:var(--orange);">⚠️ Max: 100 pages per run</p>
     </div>
     <div class="card blue-glow">
       <h3>🖼️ Image Files</h3>
-      <p style="font-size:.85rem;margin-top:8px;">Supports <strong>PNG, JPG, JPEG, TIFF, BMP, WEBP</strong>. Loaded directly with Pillow. <strong>Always converted to RGB</strong> — this removes alpha channels (RGBA PNGs) and palettized modes (P-mode GIFs) that would crash the ViT encoder.</p>
+      <p style="font-size:.85rem;margin-top:8px;">Supports <strong>PNG, JPG, TIFF, BMP, WEBP</strong>. We always convert to <strong>RGB colour mode</strong>. This is critical — some PNGs have a transparent alpha channel, some GIFs use indexed colours. The AI model expects plain 3-channel colour, and any mismatch would cause a silent crash.</p>
     </div>
     <div class="card purple-glow">
       <h3>📝 DOCX Files</h3>
-      <p style="font-size:.85rem;margin-top:8px;">Iterates over <code>doc.part.rels</code> to extract all embedded images by relationship type. Each image blob is opened with Pillow and converted to RGB. Up to 100 images are processed as individual pages.</p>
+      <p style="font-size:.85rem;margin-top:8px;">Word documents often have <strong>scanned pages pasted as images inside them</strong>. We walk through the file's internal links to find and extract each embedded image blob, then treat each one as a separate page. Up to 100 images supported.</p>
     </div>
   </div>
 
   <div class="card" style="margin-top:22px;border-color:rgba(16,185,129,.3);">
-    <strong style="color:#6ee7b7;font-size:.82rem;">KEY DESIGN DECISION — NO BINARIZATION</strong>
-    <p style="font-size:.85rem;margin-top:8px;">Traditional OCR pipelines binarize (threshold to black/white) images to reduce noise. We deliberately skip this step. Surya's Vision Transformer is trained on <strong>full-colour RGB images</strong>. Binarization destroys the subtle grey-level information in vowel mark hairlines (especially in Tamil & Telugu), causing the model to misread or drop characters entirely.</p>
+    <strong style="color:#6ee7b7;font-size:.82rem;">KEY DECISION — WHY WE NEVER CONVERT TO BLACK &amp; WHITE</strong>
+    <p style="font-size:.85rem;margin-top:8px;">Old OCR systems convert pages to black &amp; white to "clean them up". We deliberately don't. The thin grey hairlines that form vowel marks in Tamil and Telugu are too faint — they <strong>disappear the moment you binarize</strong>, and the model misreads or completely skips those characters. Surya was trained on full-colour images, so we keep them that way.</p>
   </div>
 </div>
 
@@ -367,35 +365,35 @@ code{font-family:'JetBrains Mono',monospace;font-size:.82rem;
 ════════════════════════════════════════════════ -->
 <div class="slide" id="s6">
   <span class="tag">Stage 2</span>
-  <h2>Surya <span class="grad-text">Vision Transformer</span> OCR Engine</h2>
-  <p style="margin-top:8px;max-width:700px;">The recognition core uses two cooperating transformer models — one for geometry, one for reading.</p>
+  <h2>The AI <span class="grad-text">OCR Engine</span> — How the Model Reads</h2>
+  <p style="margin-top:8px;max-width:700px;">Two cooperating AI models work together — think of them as a <strong>Highlighter</strong> and a <strong>Typist</strong>.</p>
 
   <div class="grid-2" style="margin-top:22px;">
     <div style="display:flex;flex-direction:column;gap:14px;">
       <div class="card blue-glow">
-        <h3>🔲 Model 1 — Line Detection</h3>
-        <p style="font-size:.85rem;margin-top:8px;">A <strong>CNN/Transformer hybrid</strong> scans the full-page image and outputs <strong>line-level bounding boxes</strong> in pixel coordinates. Each box tightly frames one text line — a single sentence or part of a paragraph.</p>
-        <p style="font-size:.82rem;margin-top:8px;color:var(--blue);">Output: list of <code>[x0, y0, x1, y1]</code> + per-line confidence scores</p>
+        <h3>🔦 Model 1 — The Highlighter (Detection)</h3>
+        <p style="font-size:.85rem;margin-top:8px;">This model scans the entire page image and <strong>draws a box around every text line</strong> it finds — one box per sentence or paragraph fragment. It doesn't read any words yet. It just marks <em>where</em> text is.</p>
+        <p style="font-size:.82rem;margin-top:8px;color:var(--blue);">Output: coordinates for each box + a confidence score saying how sure it is</p>
       </div>
       <div class="card cyan-glow">
-        <h3>📖 Model 2 — Sequence Recognition</h3>
-        <p style="font-size:.85rem;margin-top:8px;">Each detected line crop is fed into an encoder-decoder ViT. The encoder maps the image patch to a dense feature vector. The decoder autoregressively generates the <strong>Unicode character sequence</strong>, one token at a time.</p>
-        <p style="font-size:.82rem;margin-top:8px;color:var(--cyan);">No fixed character vocabulary — works on <strong>any script</strong> it was trained on</p>
+        <h3>✍️ Model 2 — The Typist (Recognition)</h3>
+        <p style="font-size:.85rem;margin-top:8px;">Each highlighted line crop is handed to this model. It <strong>looks at the image of that line and types out the characters</strong>, one by one, until the full line is written. It has no fixed list of allowed letters — it can produce <em>any</em> Unicode character in any script.</p>
+        <p style="font-size:.82rem;margin-top:8px;color:var(--cyan);">No fixed vocabulary — works on any script it was trained on</p>
       </div>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px;">
       <div class="card purple-glow">
-        <h3>💡 Why ViT Over CRNN?</h3>
-        <ul style="margin-top:10px;display:flex;flex-direction:column;gap:7px;font-size:.85rem;">
-          <li>CRNNs slice images column-by-column — Indic <strong>akshara clusters</strong> span multiple columns and get split incorrectly</li>
-          <li>ViT patches cover the <strong>entire receptive field</strong> simultaneously — compound characters are seen as a whole</li>
-          <li>Attention mechanism naturally handles <strong>right-to-left reordering</strong> of vowel marks</li>
+        <h3>💡 Why ViT, Not the Old Way?</h3>
+        <ul style="margin-top:10px;display:flex;flex-direction:column;gap:8px;font-size:.85rem;">
+          <li>Old systems read letter by letter, slicing the image into thin columns. Tamil letters <strong>fuse across multiple columns</strong> — slicing right through them produces garbage.</li>
+          <li>The Vision Transformer looks at the <strong>whole line at once as a single image patch</strong>. Compound characters are seen as a whole, not split apart.</li>
+          <li>Its attention mechanism naturally picks up <strong>long-range dependencies</strong> — e.g. a vowel mark on the right that changes the meaning of the consonant on the left.</li>
         </ul>
       </div>
       <div class="card green-glow">
-        <h3>📊 Output Format</h3>
-        <p style="font-size:.85rem;margin-top:8px;">Each line returns a dict: <code>{"text": "...", "bbox": [...], "confidence": 0.97}</code></p>
-        <p style="font-size:.85rem;margin-top:8px;">Confidence scores below <strong>0.90</strong> are flagged for surgical correction in the NLP stage. Lines below <strong>0.30</strong> are discarded entirely.</p>
+        <h3>📊 What Each Line Returns</h3>
+        <p style="font-size:.85rem;margin-top:8px;">For every detected line, the engine gives back: the <strong>text it read</strong>, the <strong>bounding box</strong> (where on the page), and a <strong>confidence score</strong> from 0 to 1.</p>
+        <p style="font-size:.85rem;margin-top:8px;">Scores below <strong>0.90</strong> are flagged for the NLP cleaning stage. Scores below <strong>0.30</strong> are discarded entirely as unreadable noise.</p>
       </div>
     </div>
   </div>
@@ -411,14 +409,14 @@ code{font-family:'JetBrains Mono',monospace;font-size:.82rem;
 ════════════════════════════════════════════════ -->
 <div class="slide" id="s7">
   <span class="tag">Stage 3</span>
-  <h2>Cognitive <span class="grad-text">Layout</span> Analysis Engine</h2>
-  <p style="margin-top:8px;max-width:700px;">Raw OCR lines are just a bag of text — they have no structure. The Layout Engine understands the page as a semantic document.</p>
+  <h2>The <span class="grad-text">Layout</span> Engine — Reading the Page Like a Human</h2>
+  <p style="margin-top:8px;max-width:700px;">After the Typist writes out the text, we need to understand <em>what kind of text</em> each region is. A raw list of lines has no idea what's a headline, what's a footnote, and what's an image caption.</p>
 
   <div class="grid-2" style="margin-top:22px;">
     <div style="display:flex;flex-direction:column;gap:14px;">
       <div class="card blue-glow">
-        <h3>🏷️ Surya LayoutPredictor</h3>
-        <p style="font-size:.85rem;margin-top:8px;">Runs on the same <code>FoundationPredictor</code> backbone as the OCR engine — <strong>no second GPU load</strong>. Classifies every region of the page into one of 14 semantic labels:</p>
+        <h3>🏠 The Document Organizer</h3>
+        <p style="font-size:.85rem;margin-top:8px;">The same AI backbone that powered the OCR engine now looks at the <strong>full page as a whole</strong> and labels every region with its semantic type. Because it reuses the same model weights, <strong>no extra GPU memory is consumed</strong>. It recognises 14 region types:</p>
         <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;">
           <code style="font-size:.72rem;">Text</code><code style="font-size:.72rem;">SectionHeader</code><code style="font-size:.72rem;">PageHeader</code><code style="font-size:.72rem;">PageFooter</code>
           <code style="font-size:.72rem;">Caption</code><code style="font-size:.72rem;">ListItem</code><code style="font-size:.72rem;">Table</code><code style="font-size:.72rem;">Picture</code>
@@ -426,22 +424,22 @@ code{font-family:'JetBrains Mono',monospace;font-size:.82rem;
         </div>
       </div>
       <div class="card orange-glow">
-        <h3>🔍 Block Deduplication (IoU)</h3>
-        <p style="font-size:.85rem;margin-top:8px;">The model often returns multiple overlapping predictions for the same region. We compute <strong>Intersection-over-Union (IoU)</strong> between all bounding box pairs. If IoU &gt; 0.70, the lower-confidence block is dropped. This collapses 40+ duplicate boxes into a clean single block.</p>
+        <h3>🧹 The Cleanup Crew (IoU Deduplication)</h3>
+        <p style="font-size:.85rem;margin-top:8px;">The AI often draws <strong>multiple overlapping boxes</strong> on the same paragraph — like stacking highlighters on the same sentence. We measure how much each pair of boxes overlaps (this ratio is called <strong>IoU</strong>). If two boxes overlap more than <strong>70%</strong>, we keep only the more confident one and throw the other away. This collapses 40+ duplicate detections into one clean block.</p>
       </div>
     </div>
     <div style="display:flex;flex-direction:column;gap:14px;">
       <div class="card purple-glow">
-        <h3>🚫 Semantic Filtering</h3>
-        <ul style="margin-top:10px;display:flex;flex-direction:column;gap:7px;font-size:.85rem;">
-          <li><strong>SKIP_LABELS</strong>: <code>Picture</code>, <code>Figure</code>, <code>Table</code>, <code>Equation</code> — these blocks contain no extractable text. OCR is not run on them.</li>
-          <li><strong>STRUCTURAL_LABELS</strong>: <code>PageHeader</code>, <code>PageFooter</code> — stripped unless they contain real body text (detected via regex)</li>
-          <li><strong>Page number detection</strong>: Regex matches pure digits, Roman numerals, and Tamil "பக்கம்" patterns</li>
+        <h3>🚫 What Gets Filtered Out</h3>
+        <ul style="margin-top:10px;display:flex;flex-direction:column;gap:8px;font-size:.85rem;">
+          <li><strong>Images, figures, tables, equations</strong> — there is no text to extract from these regions, so we skip OCR on them entirely.</li>
+          <li><strong>Page headers &amp; footers</strong> — these are stripped out (book title repeating on every page, page number, etc.) unless they contain actual body text.</li>
+          <li><strong>Page numbers</strong> — detected by regex: pure digits, Roman numerals, and Tamil "பக்கம்" patterns are all caught.</li>
         </ul>
       </div>
       <div class="card green-glow">
-        <h3>🔄 Fallback Logic</h3>
-        <p style="font-size:.85rem;margin-top:8px;">If the model returns <em>no</em> text-class blocks (e.g., a dense newspaper page misclassified entirely as <code>Picture</code>), the engine creates a single <strong>full-page fallback block</strong> covering 100% of the image. This ensures OCR always runs, even on unusual layouts.</p>
+        <h3>🔄 Safety Net — Fallback Mode</h3>
+        <p style="font-size:.85rem;margin-top:8px;">Sometimes the AI misreads an entire newspaper page as one big "Picture" and finds no text blocks at all. When this happens, the engine creates a single <strong>full-page block</strong> covering the entire image and runs OCR on it anyway. Nothing gets skipped — we always produce output.</p>
       </div>
     </div>
   </div>
@@ -452,42 +450,42 @@ code{font-family:'JetBrains Mono',monospace;font-size:.82rem;
 ════════════════════════════════════════════════ -->
 <div class="slide" id="s8">
   <span class="tag">Stage 4</span>
-  <h2>Recursive <span class="grad-text">X-Y Cut</span> Reading Order</h2>
-  <p style="margin-top:8px;max-width:700px;">The most important innovation in the pipeline. Reconstructs the human-intended reading order from geometry alone — zero GPU cost, 100% deterministic.</p>
+  <h2>Fixing <span class="grad-text">Reading Order</span> — The X-Y Cut Algorithm</h2>
+  <p style="margin-top:8px;max-width:700px;">After layout detection we have labelled blocks scattered across the page. But <strong>in what order should they be read?</strong> A newspaper has 3 columns. A book has 1. A magazine mixes both. This algorithm figures it out — with no AI, just geometry.</p>
 
   <div class="grid-2" style="margin-top:20px;">
     <div style="display:flex;flex-direction:column;gap:12px;">
       <div class="card blue-glow">
-        <h3>Step 1 — Find a Vertical Cut</h3>
-        <p style="font-size:.85rem;margin-top:6px;">Project all block bounding boxes onto the X-axis. Search for a <strong>column gutter</strong>: an X coordinate where no block's left edge &lt; X &lt; right edge. If found within the middle 70% of the page width, this is a valid two-column split. <strong>Recurse</strong> into left column and right column separately.</p>
+        <h3>Step 1 — Look for a Vertical Split</h3>
+        <p style="font-size:.85rem;margin-top:6px;">Imagine drawing a vertical line down the page. If you can find a position where <strong>no text block crosses that line</strong>, the page has two columns. We read the entire left column first, top-to-bottom, then repeat for the right column. Then we split each column the same way — recursively.</p>
       </div>
       <div class="card cyan-glow">
-        <h3>Step 2 — Find a Horizontal Cut</h3>
-        <p style="font-size:.85rem;margin-top:6px;">If no vertical gutter exists, look for a <strong>horizontal band</strong>: a Y coordinate where no block straddles it. This handles a full-width headline above a two-column body. Process top band first, then recurse into the bottom.</p>
+        <h3>Step 2 — Look for a Horizontal Split</h3>
+        <p style="font-size:.85rem;margin-top:6px;">If no vertical split exists, draw a horizontal line. A <strong>full-width headline above a 2-column body</strong> creates a natural horizontal split. We read the headline first (top band), then recurse into the body below it.</p>
       </div>
       <div class="card green-glow">
-        <h3>Step 3 — Y-Sort Fallback</h3>
-        <p style="font-size:.85rem;margin-top:6px;">If neither cut is found (single-column storybook), fall back to a simple <strong>top-to-bottom sort</strong> by Y coordinate — then by X for ties. This is the path taken for the majority of Tamil books in our test set.</p>
+        <h3>Step 3 — Just Sort Top-to-Bottom</h3>
+        <p style="font-size:.85rem;margin-top:6px;">If the page has no splits at all — like a normal single-column storybook — we simply sort all blocks <strong>from top to bottom</strong>, then left-to-right for anything at the same height. Done.</p>
       </div>
     </div>
     <div>
       <div class="card purple-glow" style="height:100%;">
         <h3>📐 Why This Matters</h3>
-        <p style="font-size:.85rem;margin-top:10px;">Without layout-aware reading order, a two-column article would produce:</p>
+        <p style="font-size:.85rem;margin-top:10px;">Without this, a newspaper page would produce completely scrambled output — alternating lines from different columns:</p>
         <div style="background:var(--bg);border-radius:8px;padding:12px;margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:.78rem;color:var(--muted);line-height:1.8;">
           Line 1 col-A &nbsp; Line 1 col-B<br>
           Line 2 col-A &nbsp; Line 2 col-B<br>
           Line 3 col-A &nbsp; Line 3 col-B
         </div>
-        <p style="font-size:.85rem;margin-top:12px;">With X-Y Cut it correctly becomes:</p>
+        <p style="font-size:.85rem;margin-top:12px;">With X-Y Cut, it becomes perfectly readable:</p>
         <div style="background:var(--bg);border-radius:8px;padding:12px;margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:.78rem;color:#93c5fd;line-height:1.8;">
           Line 1 col-A<br>Line 2 col-A<br>Line 3 col-A<br>
           Line 1 col-B<br>Line 2 col-B<br>Line 3 col-B
         </div>
         <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
-          <span class="chip green">Handles single-column</span>
-          <span class="chip blue">Handles two-column</span>
-          <span class="chip purple">Handles mixed layouts</span>
+          <span class="chip green">Single-column books</span>
+          <span class="chip blue">Multi-column newspapers</span>
+          <span class="chip purple">Mixed layouts</span>
         </div>
       </div>
     </div>
@@ -499,28 +497,30 @@ code{font-family:'JetBrains Mono',monospace;font-size:.82rem;
 ════════════════════════════════════════════════ -->
 <div class="slide" id="s9">
   <span class="tag">Stage 5</span>
-  <h2>NLP <span class="grad-text">Refinement</span> & Unicode Normalization</h2>
-  <p style="margin-top:8px;max-width:700px;">Post-recognition, the assembled text passes through a deterministic NLP cleaning layer before output.</p>
+  <h2>Cleaning Up <span class="grad-text">the Text</span> — NLP Refinement</h2>
+  <p style="margin-top:8px;max-width:700px;">The Typist model is very good, but not perfect. The final stage runs a <strong>deterministic cleaning pass</strong> — no AI, just rules — to fix known artifacts before the text reaches you.</p>
 
   <div class="grid-3" style="margin-top:22px;">
     <div class="card blue-glow">
-      <h3>🧹 Noise Suppression</h3>
-      <p style="font-size:.85rem;margin-top:8px;">Regex patterns strip well-known OCR hallucination artifacts:</p>
+      <h3>🧹 Noise Removal</h3>
+      <p style="font-size:.85rem;margin-top:8px;">Vision models sometimes generate <strong>junk characters</strong> that look like text but aren't. We use regex patterns to strip them out:</p>
       <ul style="margin-top:10px;font-size:.82rem;display:flex;flex-direction:column;gap:6px;">
         <li>Stray HTML tags: <code>&lt;br&gt;</code>, <code>&lt;/p&gt;</code></li>
-        <li>Pipe characters used as column separators: <code>|</code></li>
+        <li>Pipe characters used as fake column dividers: <code>|</code></li>
         <li>Long underscore runs: <code>____</code></li>
         <li>Repeated ellipsis: <code>.....</code></li>
         <li>Empty bracket pairs: <code>[ ]</code>, <code>{ }</code></li>
       </ul>
     </div>
     <div class="card purple-glow">
-      <h3>🔤 Unicode NFC Normalization</h3>
-      <p style="font-size:.85rem;margin-top:8px;">Indic scripts encode compound characters in multiple valid ways. The Tamil letter <strong>"கி"</strong> can be represented as one precomposed codepoint OR as two separate codepoints (consonant + vowel mark). OCR engines often produce the decomposed form. We apply <code>unicodedata.normalize("NFC", text)</code> to ensure all downstream search, diff, and comparison tools work correctly.</p>
+      <h3>🔤 Unicode Fix (NFC)</h3>
+      <p style="font-size:.85rem;margin-top:8px;">Indic scripts have a hidden problem: the <strong>same letter can be stored two different ways</strong> in memory. For example, the Tamil letter <strong>"கி"</strong> can be one combined character OR a consonant followed by a separate vowel mark — they look identical on screen but are different byte sequences.</p>
+      <p style="font-size:.85rem;margin-top:8px;">OCR engines often produce the split form. We apply <strong>NFC normalisation</strong> to merge them, so search, copy-paste, and text comparison all work reliably.</p>
     </div>
     <div class="card green-glow">
-      <h3>📜 Text Reflow</h3>
-      <p style="font-size:.85rem;margin-top:8px;">The layout engine sometimes yields very short "orphan" lines (fewer than 18 chars) from narrow block crops. The <strong>reflow pass</strong> merges consecutive short lines into a unified paragraph, preventing excessive line breaks in the final output that would confuse downstream NLP models.</p>
+      <h3>📝 Line Reflow</h3>
+      <p style="font-size:.85rem;margin-top:8px;">Narrow layout blocks sometimes produce very <strong>short orphan lines</strong> — a few words dangling alone. Left as-is, these become excessive line breaks in the final output that confuse downstream tools.</p>
+      <p style="font-size:.85rem;margin-top:8px;">The reflow pass <strong>merges consecutive short lines</strong> (under 18 characters) back into a single paragraph, producing clean, readable prose.</p>
     </div>
   </div>
 
@@ -554,43 +554,43 @@ code{font-family:'JetBrains Mono',monospace;font-size:.82rem;
 ════════════════════════════════════════════════ -->
 <div class="slide" id="s10">
   <span class="tag">Deployment</span>
-  <h2>CPU + GPU <span class="grad-text">Microservice</span> Architecture</h2>
-  <p style="margin-top:8px;max-width:700px;">The biggest engineering decision: splitting the app into two independent Modal containers to eliminate idle GPU billing.</p>
+  <h2>Two Servers, <span class="grad-text">One Smart Trick</span></h2>
+  <p style="margin-top:8px;max-width:700px;">GPUs are expensive. The key insight: <strong>you only need the GPU for a few seconds per document</strong>. So we split the system into two parts — a cheap always-on web server, and a powerful GPU that only wakes up when needed.</p>
 
   <div class="grid-2" style="margin-top:20px;">
     <div style="display:flex;flex-direction:column;gap:12px;">
       <div class="card cyan-glow">
-        <h3>🖥️ CPU Container — Always On</h3>
+        <h3>🖥️ CPU Server — Always On</h3>
         <ul style="margin-top:10px;font-size:.84rem;display:flex;flex-direction:column;gap:7px;">
-          <li>Serves the <strong>Gradio web UI</strong> and FastAPI endpoint</li>
-          <li><strong>No GPU</strong> — runs on standard CPU-only instance</li>
-          <li>Accepts file uploads, renders the interface, streams logs</li>
-          <li>Costs fractions of a cent per hour — negligible billing</li>
+          <li>Serves the <strong>website and upload form</strong> to users 24/7</li>
+          <li><strong>No GPU</strong> — runs on a cheap CPU-only instance that costs almost nothing</li>
+          <li>Accepts your file, shows the progress log, and delivers the download link</li>
+          <li>Think of it as the <strong>reception desk</strong> — always there, no heavy lifting</li>
         </ul>
         <div style="margin-top:10px;"><code>@app.function(image=cpu_image, min_containers=0)</code></div>
       </div>
       <div class="card blue-glow">
-        <h3>⚡ GPU Container — On Demand Only</h3>
+        <h3>⚡ GPU Server — On Demand Only</h3>
         <ul style="margin-top:10px;font-size:.84rem;display:flex;flex-direction:column;gap:7px;">
-          <li>Cold-starts <strong>only</strong> when user clicks "Run OCR"</li>
-          <li>Provisions <strong>NVIDIA T4 GPU</strong>, loads Surya models (~15s)</li>
-          <li>Processes document, yields JSON progress events via <code>remote_gen()</code></li>
-          <li>Writes output .txt to <strong>shared Modal Volume</strong>, then scales to zero</li>
+          <li>Completely <strong>switched off</strong> until you click "Run OCR"</li>
+          <li>Boots up, loads the AI models (~15 seconds cold start), processes your document</li>
+          <li>Streams live progress updates back to the UI as it works</li>
+          <li>The moment it finishes — <strong>it shuts down</strong>. You pay for those seconds only.</li>
         </ul>
         <div style="margin-top:10px;"><code>@app.function(gpu="T4", min_containers=0)</code></div>
       </div>
     </div>
     <div class="card purple-glow" style="display:flex;flex-direction:column;justify-content:space-between;">
       <div>
-        <h3>📡 Inter-Container Communication</h3>
-        <p style="font-size:.84rem;margin-top:8px;">When the user clicks Run OCR, the CPU container:</p>
+        <h3>📡 How They Talk to Each Other</h3>
+        <p style="font-size:.84rem;margin-top:8px;">When you click Run OCR, here's exactly what happens step by step:</p>
         <ol style="margin-top:10px;padding-left:16px;font-size:.84rem;display:flex;flex-direction:column;gap:8px;color:var(--muted);">
-          <li>Reads the uploaded file into <strong>raw bytes</strong> in memory</li>
-          <li>Calls <code>run_ocr_gpu.remote_gen(file_bytes, langs, ...)</code></li>
-          <li>Iterates the generator — each event is a <strong>JSON string</strong></li>
-          <li>Parses event type: <code>progress</code> → update log, <code>done</code> → set download</li>
+          <li>The CPU server reads your uploaded file into memory as raw bytes</li>
+          <li>It sends those bytes to the GPU server and says <strong>"start processing"</strong></li>
+          <li>The GPU server sends back <strong>live status messages</strong> one by one as it works — that's the streaming log you see</li>
+          <li>When done, it sends a final <strong>"done"</strong> message and the CPU server gives you the download link</li>
         </ol>
-        <p style="font-size:.82rem;margin-top:12px;color:var(--muted);">The live streaming log the user sees in the UI is powered by this JSON event stream flowing from the GPU container back to the CPU container in real time.</p>
+        <p style="font-size:.82rem;margin-top:12px;color:var(--muted);">The live log you watch in the browser is powered by this real-time message stream between the two servers.</p>
       </div>
       <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
         <span class="chip orange">$0 when idle</span>
@@ -664,32 +664,32 @@ code{font-family:'JetBrains Mono',monospace;font-size:.82rem;
 <div class="slide" id="s12">
   <div class="blob" style="top:-5%;right:-5%;width:500px;height:500px;background:radial-gradient(var(--purple),transparent);opacity:.15;"></div>
   <span class="tag">Future Scope</span>
-  <h2>Neural Language Correction — <span class="grad2-text">ByT5</span></h2>
-  <p style="margin-top:8px;max-width:740px;">The next planned upgrade: a character-level Language Model pass that fixes residual OCR errors the Vision model couldn't catch. <strong>Not implemented in the current deployment.</strong></p>
+  <h2>Next Step — Teaching the System to <span class="grad2-text">Self-Correct</span></h2>
+  <p style="margin-top:8px;max-width:740px;">Even at 93% accuracy, ~7% of characters are wrong. The next planned upgrade adds an <strong>AI proofreader</strong> that reads the output and fixes the remaining mistakes. <strong>Not implemented yet — planned for Phase 3.</strong></p>
 
   <div class="grid-3" style="margin-top:28px;">
     <div class="card purple-glow">
-      <h3>🔬 Why ByT5?</h3>
+      <h3>🤔 Why Can't a Normal AI Fix This?</h3>
       <ul style="margin-top:10px;font-size:.84rem;display:flex;flex-direction:column;gap:8px;">
-        <li>Standard LLMs use <strong>subword tokenizers</strong> — a single OCR typo fragments a Tamil word into unrecognizable pieces</li>
-        <li><strong>ByT5 operates on raw UTF-8 bytes</strong> — every character is its own token, with no vocabulary mismatch possible</li>
-        <li>Uniquely suited to surgically fix character-level OCR garbling in complex Indic scripts</li>
+        <li>ChatGPT-style models break text into <strong>chunks of common word-pieces</strong> before reading. A single OCR typo in Tamil (one wrong character) <strong>destroys the entire chunk</strong> — the model can't recognise the word at all.</li>
+        <li><strong>ByT5 reads raw bytes</strong> instead — every single character is its own token. A one-character typo is just one bad byte among many good ones, and the model can easily fix it in context.</li>
+        <li>This makes ByT5 uniquely suited for <strong>character-level surgical correction</strong> in complex Indic scripts.</li>
       </ul>
     </div>
     <div class="card blue-glow">
-      <h3>🎯 Correction Strategy</h3>
+      <h3>🎯 The Correction Strategy</h3>
       <ul style="margin-top:10px;font-size:.84rem;display:flex;flex-direction:column;gap:8px;">
-        <li>Only route lines with <strong>confidence &lt; 0.90</strong> through ByT5 — high-confidence lines are left untouched for throughput</li>
-        <li>Lines with <strong>known noise patterns</strong> (HTML tags, pipes, underscore runs) also get corrected regardless of score</li>
-        <li>Runs as an isolated post-processing step — does not alter the core OCR pipeline</li>
+        <li>Only lines with a <strong>confidence score below 0.90</strong> are sent to ByT5 — high-confidence lines are left untouched so we don't slow things down unnecessarily.</li>
+        <li>Lines with <strong>known junk patterns</strong> (HTML tags, pipe characters, underscore runs) are also corrected regardless of their score.</li>
+        <li>The corrector runs as a completely <strong>separate step after the main pipeline</strong> — it can be switched off without touching anything else.</li>
       </ul>
     </div>
     <div class="card green-glow">
-      <h3>📈 Expected Impact</h3>
+      <h3>📈 Expected Improvement</h3>
       <ul style="margin-top:10px;font-size:.84rem;display:flex;flex-direction:column;gap:8px;">
-        <li>Target CER improvement: <strong>~7% → ~4%</strong> on clean modern print</li>
-        <li>Stronger gains expected on degraded archival prints where Surya leaves more residual errors</li>
-        <li>Model: <code>google/byt5-small</code> — compact enough for T4 inference alongside Surya</li>
+        <li>Target: reduce error rate from <strong>~7% → ~4%</strong> on clean modern print</li>
+        <li>Bigger gains on <strong>degraded archival documents</strong> where the OCR model struggles most</li>
+        <li>Uses <code>google/byt5-small</code> — a compact model that fits alongside Surya on the same T4 GPU</li>
       </ul>
       <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
         <span class="chip purple">Planned</span>
