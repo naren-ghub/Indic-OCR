@@ -23,13 +23,6 @@ _SERVER      = _REPO_ROOT / "pipeline" / "byt5_server.py"
 # The dedicated venv with transformers==5.8.0 (compatible with the trained model)
 _VENV_PYTHON = _NLP_ROOT / ".venv_byt5" / "Scripts" / "python.exe"
 
-if not _VENV_PYTHON.exists():
-    raise RuntimeError(
-        f"[LMCorrector] ByT5 venv not found at {_VENV_PYTHON}\n"
-        "Run: python -m venv .venv_byt5 && .venv_byt5\\Scripts\\pip install transformers==5.8.0 torch huggingface_hub accelerate"
-    )
-
-
 class LMCorrector:
     """
     Wraps the ByT5 fine-tuned model for Tamil OCR correction via subprocess.
@@ -37,6 +30,11 @@ class LMCorrector:
     """
 
     def __init__(self, model_id="Naren-hug/byt5-tamil-ocr-v1", device=None):
+        if not _VENV_PYTHON.exists():
+            raise RuntimeError(
+                f"[LMCorrector] ByT5 venv not found at {_VENV_PYTHON}\n"
+                "Run: python -m venv .venv_byt5 && .venv_byt5\\Scripts\\pip install transformers==5.8.0 torch huggingface_hub accelerate"
+            )
         print(f"[LMCorrector] Spawning ByT5 server (device=cuda)...")
         # Use binary mode (no encoding=) to avoid Windows cp1252/surrogate issues
         self._proc = subprocess.Popen(

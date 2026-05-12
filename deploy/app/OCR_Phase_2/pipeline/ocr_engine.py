@@ -178,7 +178,6 @@ class SuryaEngine(BaseOCREngine):
 
         predictions = self._recognition_predictor(
             images=images,
-            langs=[self.langs] * len(images),
             task_names=["ocr_without_boxes"] * len(images),
             det_predictor=self._detection_predictor,
         )
