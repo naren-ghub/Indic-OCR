@@ -7,10 +7,10 @@
   [![Framework](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org)
   [![Model](https://img.shields.io/badge/Surya-Vision_Transformer-green)](https://github.com/VikParuchuri/surya)
   [![Finetune](https://img.shields.io/badge/ByT5-google%2Fbyt5--small-yellow)](https://huggingface.co/google/byt5-small)
-  
-  <br /><br />
-  
-  <h2>🌟 <a href="https://naren-ghub.github.io/Indic-OCR/">Try the Live Application</a> 🌟</h2>
+
+  `<br /><br />`
+
+<h2>🌟 <a href="https://naren-ghub.github.io/Indic-OCR/">Try the Live Application</a> 🌟</h2>
   <p><i>Upload your scanned PDFs or images, select from 11 Indic languages, and watch our GPU-accelerated Vision AI extract pristine, layout-preserved text—instantly and for free.</i></p>
 
 </div>
