@@ -51,9 +51,9 @@ Post-recognition, the text undergoes a rigorous NLP cleaning phase:
 - Strict **Unicode Normalization (NFC)** to ensure combined characters in Indic scripts (vowel marks and consonants) are represented consistently.
 - Intelligent **Header/Footer Stripping** using `TextFormatter` to ensure seamless reading flow across page boundaries.
 
-### 5. Phase 3: Agentic Architecture & Hybrid Local Correction (Current State)
+### 5. Phase 3: Agent Workflow & Hybrid Local Correction (Current State)
 
-The pipeline has been upgraded into an intelligent agentic wrapper (`graph.py`) to handle complex historical documents without hallucinating data.
+The pipeline integrates an intelligent Agent Workflow (`graph.py`) to dynamically route documents, reason about complex historical layouts, and handle errors without hallucinating data.
 - **Router Agent (Vision LLM):** Analyzes the first page to detect document type, language, noise levels, and estimated column count.
 - **Enhanced Context-Aware Layout Engine:** Uses the Router's column estimation to look for narrow vertical gutters and cleanly separate text in dense newspapers.
 - **QA Agent:** Evaluates OCR confidence scores and triggers retries if the average confidence drops below 80%.

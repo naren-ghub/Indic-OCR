@@ -395,7 +395,7 @@ Download the sample Tamil story **எலி** (*The Mouse*, by Jeyamohan) and it
 
 ### 🧩 The AI Stack
 
-The pipeline is orchestrated across specialized agentic and neural layers:
+The pipeline integrates a specialized Agent Workflow alongside neural layers:
 
 1. **Router Agent (Vision LLM)**
    Analyzes the first page to detect document type, language, noise levels, and estimated column count.
