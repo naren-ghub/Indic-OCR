@@ -7,9 +7,10 @@
   [![Framework](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org)
   [![Model](https://img.shields.io/badge/Surya-Vision_Transformer-green)](https://github.com/VikParuchuri/surya)
   [![Finetune](https://img.shields.io/badge/ByT5-google%2Fbyt5--small-yellow)](https://huggingface.co/google/byt5-small)
-
-
-<h2>🌟 <a href="https://naren-ghub.github.io/Indic-OCR/">Try the Live Application</a> 🌟</h2>
+  
+  <br /><br />
+  
+  <h2>🌟 <a href="https://naren-ghub.github.io/Indic-OCR/">Try the Live Application</a> 🌟</h2>
   <p><i>Upload your scanned PDFs or images, select from 11 Indic languages, and watch our GPU-accelerated Vision AI extract pristine, layout-preserved text—instantly and for free.</i></p>
 
 </div>
@@ -50,9 +51,18 @@ Post-recognition, the text undergoes a rigorous NLP cleaning phase:
 - Strict **Unicode Normalization (NFC)** to ensure combined characters in Indic scripts (vowel marks and consonants) are represented consistently.
 - Intelligent **Header/Footer Stripping** using `TextFormatter` to ensure seamless reading flow across page boundaries.
 
+### 5. Phase 3: Agentic Architecture & Hybrid Local Correction (Current State)
+
+The pipeline has been upgraded into an intelligent agentic wrapper (`graph.py`) to handle complex historical documents without hallucinating data.
+- **Router Agent (Vision LLM):** Analyzes the first page to detect document type, language, noise levels, and estimated column count.
+- **Enhanced Context-Aware Layout Engine:** Uses the Router's column estimation to look for narrow vertical gutters and cleanly separate text in dense newspapers.
+- **QA Agent:** Evaluates OCR confidence scores and triggers retries if the average confidence drops below 80%.
+- **Subprocess Isolation (IndicBART):** To resolve CUDA deadlocks and LLM truncation issues, **IndicBART** runs as a dedicated background server (`indicbart_server.py`). It surgically corrects archaic spellings (e.g., `இல்லே` → `இல்லை`) while preserving 100% of the body text.
+- **`--only-bart` Bypass Mode:** A strict local-only mode that bypasses the external LLM agents. This is the recommended production setting for archival preservation to guarantee zero data loss.
+
 ---
 
-## 🚀 Socpe: Neural Language Correction (ByT5 Finetuning)
+## 🚀 Future Scope: Neural Language Correction (ByT5 Finetuning)
 
 To push the Character Error Rate (CER) below 5%, the pipeline incorporates a **Neural Correction Pass** utilizing a custom fine-tuned `google/byt5-small` model.
 
