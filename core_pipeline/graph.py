@@ -39,6 +39,10 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
 # ── Imports ───────────────────────────────────────────────────────────────────
 from groq import Groq
 from openai import OpenAI
+from dotenv import load_dotenv
+
+# Load credentials from .env file
+load_dotenv()
 
 from pipeline.pdf_converter import pdf_to_images
 from pipeline.ocr_engine import SuryaEngine
@@ -115,8 +119,8 @@ def node_router(state: AgentState, groq_client: Groq) -> AgentState:
         logger.error("Could not extract pages from %s", state.input_path)
         return state
 
-    page1 = pages[0]
-    routing = run_router_agent(page1, groq_client, model=GROQ_VISION_MODEL)
+    page1_img = pages[0][1]
+    routing = run_router_agent(page1_img, groq_client, model=GROQ_VISION_MODEL)
 
     state.doc_type          = routing.get("doc_type", "modern_print")
     state.detected_language = routing.get("detected_language", state.lang_hints[0])
@@ -145,12 +149,19 @@ def node_ocr_execution(state: AgentState) -> AgentState:
     state.total_pages = len(pages)
 
     lang_codes = list(dict.fromkeys([state.detected_language] + state.lang_hints + ["en"]))
-    engine        = SuryaEngine(langs=lang_codes)
-    layout_engine = LayoutEngine()
+    
+    from surya.foundation import FoundationPredictor
+    fp = FoundationPredictor(device="cuda")
+    
+    engine        = SuryaEngine(langs=lang_codes, foundation_predictor=fp)
+    layout_engine = LayoutEngine(foundation_predictor=fp)
     cleaner       = Cleaner()
+    
+    from pipeline.lm_corrector import LMCorrector
+    lm_corrector = LMCorrector(device="cuda")
 
     page_results = []
-    for i, raw_img in enumerate(pages, start=1):
+    for i, raw_img in pages:
         logger.info("  Page %d/%d …", i, state.total_pages)
 
         # Preprocessing
@@ -169,15 +180,20 @@ def node_ocr_execution(state: AgentState) -> AgentState:
 
         page_data = batch[0]
         lines      = page_data.get("lines", [])
+        
+        # Hybrid AI Correction: Surgically fix low-confidence words
+        # before assembling paragraphs
+        logger.info("     [LMCorrector] Running surgical line correction...")
+        lines = lm_corrector.surgical_correct_lines(lines, threshold=0.90)
+        
         confidences = [ln.get("confidence", 0.0) for ln in lines]
         raw_text    = "\n".join(ln.get("text", "") for ln in lines)
 
-        # Layout engine
-        layout_blocks = layout_engine.detect(pil_img)
-        ordered_text  = layout_engine.reconstruct_reading_order(
-            layout_blocks, lines, page_width=pil_img.width
-        )
-        cleaned = cleaner.clean(ordered_text or raw_text)
+        # Layout engine (using Router insight for column layout)
+        layout = layout_engine.analyze_page(pil_img, page_num=i, estimated_columns=state.estimated_columns)
+        ordered_text = LayoutEngine.reconstruct_page_text(lines, layout)
+        
+        cleaned = Cleaner.clean_text(ordered_text or raw_text)
 
         page_results.append({
             "page_num": i,
@@ -271,6 +287,7 @@ def run_agentic_ocr(
     oss_api_key: Optional[str] = None,
     oss_base_url: Optional[str] = None,
     oss_model: Optional[str] = None,
+    only_bart: bool = False,
 ) -> dict:
     """
     Main entry point for the Agentic OCR pipeline.
@@ -301,21 +318,22 @@ def run_agentic_ocr(
     _oss_url   = os.getenv("OSS_LLM_BASE_URL", "")
     _oss_model = os.getenv("OSS_LLM_MODEL", "")
 
-    if not _groq_key:
-        raise ValueError("GROQ_API_KEY is required for the Router Agent.")
-    if not _oss_key or not _oss_url or not _oss_model:
-        raise ValueError(
-            "OSS_LLM_API_KEY, OSS_LLM_BASE_URL, and OSS_LLM_MODEL are required "
-            "for the QA Agent and Final Processor."
-        )
+    if not only_bart:
+        if not _groq_key:
+            raise ValueError("GROQ_API_KEY is required for the Router Agent.")
+        if not _oss_key or not _oss_url or not _oss_model:
+            raise ValueError(
+                "OSS_LLM_API_KEY, OSS_LLM_BASE_URL, and OSS_LLM_MODEL are required "
+                "for the QA Agent and Final Processor."
+            )
 
     OSS_MODEL    = _oss_model
     OSS_BASE_URL = _oss_url
     OSS_API_KEY  = _oss_key
 
-    # ── Initialise LLM clients ────────────────────────────────────────────────
-    groq_client = Groq(api_key=_groq_key)
-    llm_client  = OpenAI(api_key=_oss_key, base_url=_oss_url)
+    # ── Initialise LLM clients (if needed) ────────────────────────────────────
+    groq_client = Groq(api_key=_groq_key) if _groq_key else None
+    llm_client  = OpenAI(api_key=_oss_key, base_url=_oss_url) if _oss_key else None
 
     # ── Initialise state ──────────────────────────────────────────────────────
     state = AgentState(
@@ -327,10 +345,19 @@ def run_agentic_ocr(
     logger.info("★ Starting Agentic OCR — %s", input_path)
 
     # ── Run nodes ─────────────────────────────────────────────────────────────
-    state = node_router(state, groq_client)
-    state = node_ocr_execution(state)
-    state = node_qa(state, llm_client)
-    state = node_final_processor(state, llm_client)
+    if only_bart:
+        logger.info("⚡ ONLY_BART MODE: Bypassing all LLM agents.")
+        state.detected_language = state.lang_hints[0] if state.lang_hints else "ta"
+        state.doc_type = "historical_scan" # Enable preprocessing for bart mode
+        state = node_ocr_execution(state)
+        # Manual assembly since we skipped the Final Processor
+        parts = [f"=== PAGE {pr['page_num']} ===\n{pr['text']}" for pr in state.page_results]
+        state.final_markdown = "\n\n".join(parts)
+    else:
+        state = node_router(state, groq_client)
+        state = node_ocr_execution(state)
+        state = node_qa(state, llm_client)
+        state = node_final_processor(state, llm_client)
 
     elapsed_total = time.perf_counter() - t_total
 

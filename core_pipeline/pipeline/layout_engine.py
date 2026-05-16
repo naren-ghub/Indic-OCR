@@ -197,7 +197,7 @@ class LayoutEngine:
         return accepted
 
     @staticmethod
-    def _sort_blocks_reading_order(blocks: List[LayoutBlock]) -> List[LayoutBlock]:
+    def _sort_blocks_reading_order(blocks: List[LayoutBlock], estimated_columns: int = 1) -> List[LayoutBlock]:
         """
         Sort layout blocks in natural reading order using Recursive X-Y Cut.
 
@@ -220,10 +220,10 @@ class LayoutEngine:
         if len(blocks) <= 1:
             return blocks
 
-        return LayoutEngine._xy_cut(blocks)
+        return LayoutEngine._xy_cut(blocks, estimated_columns=estimated_columns)
 
     @staticmethod
-    def _xy_cut(blocks: List[LayoutBlock]) -> List[LayoutBlock]:
+    def _xy_cut(blocks: List[LayoutBlock], estimated_columns: int = 1) -> List[LayoutBlock]:
         """
         Core recursive X-Y Cut implementation.
 
@@ -245,9 +245,14 @@ class LayoutEngine:
         region_y1 = max(b.bbox[3] for b in blocks)
 
         vertical_cut = None
+        
+        # If the Router tells us this is multi-column, we allow a small amount 
+        # of horizontal bounding box overlap (noise tolerance) when looking for the gutter.
+        overlap_tolerance = 15 if estimated_columns > 1 else 0
+        
         for x in x_coords:
             # Check: does any block span across this x position?
-            crosses = any(b.bbox[0] < x < b.bbox[2] for b in blocks)
+            crosses = any(b.bbox[0] + overlap_tolerance < x < b.bbox[2] - overlap_tolerance for b in blocks)
             if crosses:
                 continue
 
@@ -283,8 +288,8 @@ class LayoutEngine:
             straddle_sorted = sorted(straddle, key=lambda b: b.bbox[1])
 
             return (straddle_sorted +
-                    LayoutEngine._xy_cut(sorted(left_blocks,  key=lambda b: b.bbox[1])) +
-                    LayoutEngine._xy_cut(sorted(right_blocks, key=lambda b: b.bbox[1])))
+                    LayoutEngine._xy_cut(sorted(left_blocks,  key=lambda b: b.bbox[1]), estimated_columns) +
+                    LayoutEngine._xy_cut(sorted(right_blocks, key=lambda b: b.bbox[1]), estimated_columns))
 
         # ── Step 2: No vertical gutter found → try horizontal cut ──────────
         # A horizontal cut separates full-width bands (e.g., article headline
@@ -305,8 +310,8 @@ class LayoutEngine:
         if horizontal_cut is not None:
             top_blocks    = [b for b in blocks if b.bbox[3] <= horizontal_cut]
             bottom_blocks = [b for b in blocks if b.bbox[1] >= horizontal_cut]
-            return (LayoutEngine._xy_cut(top_blocks) +
-                    LayoutEngine._xy_cut(bottom_blocks))
+            return (LayoutEngine._xy_cut(top_blocks, estimated_columns) +
+                    LayoutEngine._xy_cut(bottom_blocks, estimated_columns))
 
         # ── Step 3: No clean cut found → pure Y sort (single column) ───────
         return sorted(blocks, key=lambda b: (b.bbox[1], b.bbox[0]))
@@ -317,6 +322,7 @@ class LayoutEngine:
         self,
         image: Image.Image,
         page_num: int = 0,
+        estimated_columns: int = 1,
         min_confidence: float = 0.30,
     ) -> PageLayout:
         """
@@ -375,10 +381,10 @@ class LayoutEngine:
             layout.fallback = True
         else:
             # Deduplicate overlapping blocks (collapses 41 dupes → 1)
-            deduped = self._deduplicate_blocks(usable)
+            deduped = self._deduplicate_blocks(usable, iou_threshold=0.60 if estimated_columns > 1 else 0.70)
             # Apply X-Y Cut reading order: handles both single-column
             # (falls through to Y-sort) and two-column layouts correctly.
-            layout.blocks = self._sort_blocks_reading_order(deduped)
+            layout.blocks = self._sort_blocks_reading_order(deduped, estimated_columns=estimated_columns)
 
         return layout
 

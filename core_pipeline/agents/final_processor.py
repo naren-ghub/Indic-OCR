@@ -29,39 +29,48 @@ SUPPORTED_LANGUAGES = {
     "en": "English",
 }
 
-_FINAL_SYSTEM = """You are an expert multilingual Indic document archivist.
+_PASS1_SYSTEM = """You are an expert multilingual Indic document structurer.
 
 Supported language codes and names:
   ta=Tamil, hi=Hindi, te=Telugu, bn=Bengali, kn=Kannada,
   ml=Malayalam, gu=Gujarati, mr=Marathi, pa=Punjabi, or=Odia, en=English
 
 You will receive the complete OCR-extracted text of a document.
-Perform ALL of the following in ONE pass:
+Perform ONLY the following structural tasks:
 
-1. PROOFREAD — Fix obvious OCR character errors using linguistic and contextual clues.
-   - If unsure whether a word is an OCR error or archaic / dialect vocabulary, LEAVE IT unchanged.
-   - NEVER add, hallucinate, or invent new content.
-   - NEVER change proper nouns unless 100% certain.
-
-2. CLEAN — Remove the following:
+1. CLEAN — Remove the following:
    - Repeating running headers (same text appearing at the top of multiple pages)
    - Repeating running footers (same text at the bottom of multiple pages)
    - Standalone page numbers (bare numbers on their own line)
    - OCR noise artifacts: stray pipe characters |, long underscores ____, stray HTML tags
 
-3. FORMAT — Structure the output as Markdown:
+2. FORMAT — Structure the output as Markdown:
    - Chapter titles        → # Heading
    - Section headers       → ## Heading
    - Footnotes / endnotes  → > Blockquote (prefix with >)
    - Normal body text      → plain text with a blank line between paragraphs
    - Preserve the original script and language exactly as-is.
 
-Output ONLY the cleaned, formatted Markdown text.
-Do NOT add any explanation, commentary, or code fences.
+Output ONLY the cleaned, formatted Markdown text. Do NOT fix spelling yet. Do NOT add commentary.
+"""
+
+_PASS2_SYSTEM = """You are an expert multilingual Indic document proofreader.
+
+You will receive structured Markdown text that has already been cleaned of headers and footers.
+Your task is to carefully proofread the text for OCR errors:
+
+1. PROOFREAD — Fix obvious OCR character errors using linguistic and contextual clues.
+   - If unsure whether a word is an OCR error or archaic / dialect vocabulary, LEAVE IT unchanged.
+   - NEVER add, hallucinate, or invent new content.
+   - NEVER change proper nouns unless 100% certain.
+
+2. PRESERVE MARKDOWN — Keep all Markdown tags (#, >, *, etc.) exactly where they are.
+   - Output ONLY the proofread Markdown text. Do NOT add commentary.
 """
 
 # How many characters to include per LLM call (context window guard)
-_MAX_CHARS = 80_000   # ~20k tokens for most scripts — covers ~40 dense pages
+# Chunk size reduced to avoid 429 Too Many Requests on Llama 3.3 70B
+_MAX_CHARS = 5_000
 
 
 def run_final_processor(
@@ -136,16 +145,33 @@ def _process_chunk(
         f"--- FULL OCR TEXT ---\n{text}\n--- END OCR TEXT ---"
     )
 
-    response = llm_client.chat.completions.create(
+    # --- PASS 1: Structure & Format ---
+    logger.info("[FinalProcessor] Running Pass 1 (Structure & Format)…")
+    pass1_response = llm_client.chat.completions.create(
         model=model,
         messages=[
-            {"role": "system", "content": _FINAL_SYSTEM},
+            {"role": "system", "content": _PASS1_SYSTEM},
             {"role": "user", "content": user_msg},
         ],
-        temperature=0.1,   # Slight creativity for formatting, but faithful to source
-        max_tokens=8192,
+        temperature=0.1,
+        max_tokens=4000,
+    )
+    structured_text = pass1_response.choices[0].message.content.strip()
+    
+    # --- PASS 2: Contextual Proofreading ---
+    logger.info("[FinalProcessor] Running Pass 2 (Contextual Proofreading)…")
+    pass2_msg = f"--- STRUCTURED MARKDOWN ---\n{structured_text}\n--- END STRUCTURED MARKDOWN ---"
+    
+    pass2_response = llm_client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": _PASS2_SYSTEM},
+            {"role": "user", "content": pass2_msg},
+        ],
+        temperature=0.1,
+        max_tokens=4000,
     )
 
-    result = response.choices[0].message.content.strip()
-    logger.info("[FinalProcessor] Chunk complete (%d output chars).", len(result))
-    return result
+    final_result = pass2_response.choices[0].message.content.strip()
+    logger.info("[FinalProcessor] Chunk complete (%d output chars).", len(final_result))
+    return final_result

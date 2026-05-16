@@ -93,47 +93,46 @@ def run_router_agent(
 
     logger.info("[RouterAgent] Sending page 1 to Groq Vision (%s)…", model)
 
-    response = groq_client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": _ROUTER_SYSTEM},
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
-                    },
-                    {
-                        "type": "text",
-                        "text": "Classify this document page and output the JSON.",
-                    },
-                ],
-            },
-        ],
-        temperature=0.0,
-        max_tokens=256,
-    )
-
-    raw = response.choices[0].message.content.strip()
-    logger.debug("[RouterAgent] Raw response: %s", raw)
-
-    # Strip markdown fences if the model adds them
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-
     try:
+        response = groq_client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": _ROUTER_SYSTEM},
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
+                        },
+                        {
+                            "type": "text",
+                            "text": "Classify this document page and output the JSON.",
+                        },
+                    ],
+                },
+            ],
+            temperature=0.0,
+            max_tokens=256,
+        )
+        raw = response.choices[0].message.content.strip()
+        logger.debug("[RouterAgent] Raw response: %s", raw)
+
+        # Strip markdown fences if the model adds them
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+
         result = json.loads(raw)
-    except json.JSONDecodeError:
-        logger.warning("[RouterAgent] JSON parse failed, defaulting to modern_print/ta")
+    except Exception as e:
+        logger.warning("[RouterAgent] Vision API failed (%s). Defaulting to historical_scan/ta", e)
         result = {
-            "doc_type": "modern_print",
+            "doc_type": "historical_scan",
             "detected_language": "ta",
-            "noise_level": 3,
+            "noise_level": 5,
             "estimated_columns": 1,
-            "routing_reason": "Fallback — could not parse LLM response.",
+            "routing_reason": f"Fallback — Vision API error: {e}",
         }
 
     # Validate language code

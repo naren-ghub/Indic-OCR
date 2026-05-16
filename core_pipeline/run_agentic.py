@@ -45,6 +45,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--oss-key",   default=None, help="OSS LLM API key (overrides OSS_LLM_API_KEY env var)")
     p.add_argument("--oss-url",   default=None, help="OSS LLM base URL (overrides OSS_LLM_BASE_URL env var)")
     p.add_argument("--oss-model", default=None, help="OSS LLM model name (overrides OSS_LLM_MODEL env var)")
+    p.add_argument("--only-bart", action="store_true", help="Disable all LLM agents and use only IndicBART correction")
     p.add_argument("--print",     action="store_true", help="Also print final output to stdout")
     return p
 
@@ -77,6 +78,7 @@ def main() -> None:
         oss_api_key=args.oss_key,
         oss_base_url=args.oss_url,
         oss_model=args.oss_model,
+        only_bart=args.only_bart,
     )
 
     # ── Print evaluation summary ──────────────────────────────────────────────
