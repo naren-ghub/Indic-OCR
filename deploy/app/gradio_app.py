@@ -395,23 +395,22 @@ Download the sample Tamil story **எலி** (*The Mouse*, by Jeyamohan) and it
 
 ### 🧩 The AI Stack
 
-The pipeline is orchestrated across four specialized neural layers:
+The pipeline is orchestrated across specialized agentic and neural layers:
 
-1. **Neural Ingestion & Pre-processing**
-   The system handles unstructured document formats (PDF/DOCX) by converting them into high-fidelity visual tensors. For scanned documents, we employ direct bitmap extraction to bypass compression artifacts, ensuring the downstream Vision models receive the highest possible signal-to-noise ratio.
+1. **Router Agent (Vision LLM)**
+   Analyzes the first page to detect document type, language, noise levels, and estimated column count.
 
-2. **Vision-Transformer OCR Engine (Surya)**
-   At the core of the recognition layer is the **Surya Engine**, which utilizes a **Vision Transformer (ViT)** backbone. 
-   - **Bbox Detection**: A convolutional/transformer hybrid model identifies line-level regions of interest (RoI) with pixel-perfect precision.
-   - **Sequence Modeling**: The text recognition phase treats each line as a sequence-to-sequence problem, mapping visual features to Unicode character sequences. This "neural reading" approach allows the model to generalize across thousands of fonts and even handwritten-style print, which traditional pattern-matching fails to capture.
+2. **Neural Ingestion & Pre-processing**
+   The system handles unstructured document formats (PDF/DOCX) by converting them into high-fidelity visual tensors without binarization.
 
-3. **Cognitive Layout Analysis & XY-Cut Synthesis**
-   Raw OCR output is often a "bag of words" without structural meaning. We apply a **Supervised Layout Model** to segment the page into semantic blocks (Body, Header, Footer, Caption, Table). 
-   - **Semantic Filtering**: The model identifies and prunes "noise" blocks like running headers and page numbers.
-   - **Geometric Reasoning**: We employ an **XY-Cut Algorithm** on the model's bounding boxes to reconstruct the human-intended reading order. This ensures that complex multi-column academic journals or newspaper layouts are digitized in a coherent, logical stream.
+3. **Vision-Transformer OCR Engine (Surya)**
+   At the core of the recognition layer is the **Surya Engine**, which utilizes a **Vision Transformer (ViT)** backbone for pixel-perfect line detection and sequence modeling.
 
-4. **NLP Refinement & Unicode Normalization**
-   Post-recognition, the text undergoes a rigorous NLP cleaning phase. This involves regex-based noise suppression for common OCR hallucinations (like stray HTML tags or foreign script leakage) and strict **Unicode Normalization (NFKC)** to ensure that combined characters in Indic scripts (like vowel marks and consonants) are represented consistently for downstream search engines and LLMs.
+4. **Enhanced Context-Aware Layout Engine & XY-Cut Synthesis**
+   Uses the Router's column estimation to look for narrow vertical gutters and cleanly separate text in dense historical newspapers using a modified XY-Cut Algorithm.
+
+5. **Subprocess Isolation & Hybrid Local Correction (IndicBART)**
+   To resolve CUDA deadlocks and LLM truncation issues, **IndicBART** runs as a dedicated background server. It surgically corrects archaic spellings while preserving 100% of the body text and page structure.
 
 ### 🚀 Neural Language Correction *(Future Upgrade - Scope of this Project)*
 
