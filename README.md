@@ -17,7 +17,7 @@
 
 ---
 
-**Indic-OCR** is an end-to-end Computer Vision and NLP framework specifically optimized for digitizing complex documents in **11 Indic languages**.
+**Indic-OCR** is an end-to-end Computer Vision and Transformer framework specifically optimized for digitizing complex documents in **11 Indic languages**.
 
 Unlike traditional rule-based or Tesseract systems that struggle with dense layouts and complex Indic typography (such as Tamil and Telugu), this pipeline treats OCR as a unified multimodal AI problem, leveraging state-of-the-art Vision Transformers and sequence-to-sequence Language Models.
 
